@@ -1,4 +1,4 @@
-# Halogen Template
+# Halogen Hooks Sketch
 
 ### Quick Start
 ```sh
