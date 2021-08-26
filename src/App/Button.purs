@@ -5,7 +5,6 @@ import Prelude
 import App.Hooks as Hooks
 import Control.Applicative.Indexed (ipure)
 import Control.Monad.Indexed.Qualified as Ix
-import Data.Variant (inj)
 import Effect.Aff (Aff)
 import Halogen as H
 import Halogen.HTML as HH
@@ -31,10 +30,10 @@ component =
           [ HH.p_
               [ HH.text $ "Foo: " <> show foo <> " Bar: " <> show bar ]
           , HH.button
-              [ HE.onClick \_ -> Hooks.modify (inj (Proxy :: _ "foo") (foo + 1)) ]
+              [ HE.onClick \_ -> Hooks.modify (Proxy :: _ "foo") (foo + 1) ]
               [ HH.text "Incr foo" ]
           , HH.button
-              [ HE.onClick \_ -> Hooks.modify (inj (Proxy :: _ "bar") (bar + 1)) ]
+              [ HE.onClick \_ -> Hooks.modify (Proxy :: _ "bar") (bar + 1) ]
               [ HH.text "Incr bar" ]
           ]
       )

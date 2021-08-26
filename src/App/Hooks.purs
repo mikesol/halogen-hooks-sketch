@@ -9,6 +9,8 @@ module App.Hooks
   , hookAff
   , defaultOptions
   , Options
+  , ReadOnly(..)
+  , class NotReadOnly
   ) where
 
 import Prelude
@@ -19,10 +21,11 @@ import Control.Monad.Indexed (class IxMonad, iap)
 import Data.Either (Either(..))
 import Data.Functor.Indexed (class IxFunctor)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (class Newtype)
 import Data.Symbol (class IsSymbol)
 import Data.Tuple (fst, snd)
 import Data.Tuple.Nested (type (/\), (/\))
-import Data.Variant (Variant)
+import Data.Variant (Variant, inj)
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Halogen (lift)
@@ -31,9 +34,17 @@ import Halogen.HTML as HH
 import Halogen.HTML.Core as HC
 import Meeshkan.Variant (setViaVariant)
 import Prim.Row (class Lacks, class Cons)
+import Prim.TypeError (class Fail, Text)
 import Record as Record
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
+
+newtype ReadOnly a
+  = ReadOnly a
+
+derive instance newtypeReadOnly :: Newtype (ReadOnly a) _
+
+derive instance functorReadOnly :: Functor ReadOnly
 
 data HookF a
   = HookF a
@@ -153,8 +164,20 @@ data Action input slots m o
   | Receive input
   | Finalize
 
-modify :: forall input slots m o. Variant o -> Action input slots m o
-modify = Modify
+class NotReadOnly (a :: Type)
+
+instance readOnlyFail :: Fail (Text "This value is read only") => NotReadOnly (ReadOnly a)
+else instance readOnlySucceed :: NotReadOnly a
+
+modify ::
+  forall proxy input slots m sym a r1 r2.
+  NotReadOnly a =>
+  Cons sym a r1 r2 =>
+  IsSymbol sym =>
+  proxy sym ->
+  a ->
+  Action input slots m r2
+modify px v = Modify (inj px v)
 
 type HookHTML input slots m o
   = HC.HTML (H.ComponentSlot slots m (Action input slots m o)) (Action input slots m o)
@@ -195,11 +218,12 @@ handleAction { receiveInput, finalize } f = case _ of
     H.modify_ _ { hooks = Right (fst ival), html = snd ival }
   Modify v -> do
     { input, hooks } <- H.get
-    let
-      newHooks = case hooks of
-        Left l -> Left l
-        Right r -> Right (setViaVariant v r)
-    o /\ html <- runHook input newHooks
+    o /\ html <-
+      runHook input
+        ( case hooks of
+            Left l -> Left l
+            Right r -> Right (setViaVariant v r)
+        )
     H.modify_ _ { hooks = Right o, html = html }
   Receive input ->
     when receiveInput do
