@@ -32,10 +32,10 @@ component =
           [ HH.p_
               [ HH.text $ "Foo: " <> show foo <> " Bar: " <> show bar ]
           , HH.button
-              [ HE.onClick \_ -> Hooks.modifyM (Proxy :: _ "foo") (affAdd1 foo) ]
+              [ HE.onClick \_ -> Hooks.setM (Proxy :: _ "foo") (affAdd1 foo) ]
               [ HH.text "Incr foo" ]
           , HH.button
-              [ HE.onClick \_ -> Hooks.modify (Proxy :: _ "bar") (bar + 1) ]
+              [ HE.onClick \_ -> Hooks.set (Proxy :: _ "bar") (bar + 1) ]
               [ HH.text "Incr bar" ]
           ]
       )

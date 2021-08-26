@@ -5,8 +5,8 @@ module App.Hooks
   , hookM
   , component
   , Action
-  , modify
-  , modifyM
+  , set
+  , setM
   , defaultOptions
   , Options
   , ReadOnly(..)
@@ -153,7 +153,7 @@ class NotReadOnly (a :: Type)
 instance readOnlyFail :: Fail (Text "This value is read only") => NotReadOnly (ReadOnly a)
 else instance readOnlySucceed :: NotReadOnly a
 
-modify ::
+set ::
   forall proxy input slots m sym a r1 r2.
   Applicative m =>
   NotReadOnly a =>
@@ -162,9 +162,9 @@ modify ::
   proxy sym ->
   a ->
   Action input slots m r2
-modify px = modifyM px <<< pure
+set px = setM px <<< pure
 
-modifyM ::
+setM ::
   forall proxy input slots m sym a r1 r2.
   Functor m =>
   NotReadOnly a =>
@@ -173,7 +173,7 @@ modifyM ::
   proxy sym ->
   m a ->
   Action input slots m r2
-modifyM px v = Modify (inj px <$> v)
+setM px v = Modify (inj px <$> v)
 
 type HookHTML input slots m o
   = HC.HTML (H.ComponentSlot slots m (Action input slots m o)) (Action input slots m o)
