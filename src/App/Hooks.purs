@@ -28,7 +28,6 @@ module App.Hooks
   ) where
 
 import Prelude
-
 import Control.Applicative.Indexed (class IxApplicative, iapply, ipure)
 import Control.Apply.Indexed (class IxApply)
 import Control.Bind.Indexed (class IxBind, ibind)
@@ -419,9 +418,7 @@ modify ::
   proxy sym ->
   (a -> a) ->
   Action emittedValue o input slots output m
-modify px f = setMWithHooks px (\m -> do
-  o <- m
-  pure (f (Record.get (Proxy :: _ sym) o)))
+modify px f = setMWithHooks px (map f <<< map (Record.get (Proxy :: _ sym)))
 
 type HookHTML emittedValue o input slots output m
   = HC.HTML (H.ComponentSlot slots m (Action emittedValue o input slots output m)) (Action emittedValue o input slots output m)
