@@ -185,7 +185,7 @@ type HookM input state action slots output m o
 handleAction ::
   forall r input slots output m o.
   Monad m =>
-  { receiveInput :: Boolean, finalize :: { | o } -> m Unit | r } ->
+  { finalize :: { | o } -> m Unit | r } ->
   HookM input
     { hooks :: Either {} { | o }
     , input :: input
@@ -207,7 +207,7 @@ handleAction ::
     output
     m
     Unit
-handleAction { receiveInput, finalize } f = case _ of
+handleAction { finalize } f = case _ of
   Initialize -> do
     { input } <- H.get
     ival <- runHook input (Left {})
@@ -222,11 +222,10 @@ handleAction { receiveInput, finalize } f = case _ of
             Right r -> Right (setViaVariant v r)
         )
     H.modify_ _ { hooks = Right o, html = html }
-  Receive input ->
-    when receiveInput do
-      { hooks } <- H.get
-      o /\ html <- runHook input hooks
-      H.modify_ _ { input = input, hooks = Right o, html = html }
+  Receive input -> do
+    { hooks } <- H.get
+    o /\ html <- runHook input hooks
+    H.modify_ _ { input = input, hooks = Right o, html = html }
   Finalize -> do
     { hooks } <- H.get
     case hooks of
@@ -295,7 +294,7 @@ component options f =
         H.mkEval
           { initialize: Just Initialize
           , finalize: Just Finalize
-          , receive: Just <<< Receive
+          , receive: if options.receiveInput then Just <<< Receive else const Nothing
           , handleAction: handleAction options f
           , handleQuery:
               \query -> do
