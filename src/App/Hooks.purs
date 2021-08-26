@@ -25,6 +25,7 @@ import Data.Tuple.Nested (type (/\), (/\))
 import Data.Variant (Variant)
 import Effect (Effect)
 import Effect.Aff (Aff)
+import Halogen (lift)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Core as HC
@@ -150,6 +151,7 @@ data Action input slots m o
   = Initialize
   | Modify (Variant o)
   | Receive input
+  | Finalize
 
 modify :: forall input slots m o. Variant o -> Action input slots m o
 modify = Modify
@@ -162,8 +164,9 @@ type HookM input state action slots output m o
     IndexedHookF state action slots output m () o (HookHTML input slots m o)
 
 handleAction ::
-  forall input slots output m o.
-  Options ->
+  forall r input slots output m o.
+  Monad m =>
+  { receiveInput :: Boolean, finalize :: { | o } -> m Unit | r } ->
   HookM input
     { hooks :: Either {} { | o }
     , input :: input
@@ -185,7 +188,7 @@ handleAction ::
     output
     m
     Unit
-handleAction options f = case _ of
+handleAction { receiveInput, finalize } f = case _ of
   Initialize -> do
     { input } <- H.get
     ival <- runHook input (Left {})
@@ -199,10 +202,15 @@ handleAction options f = case _ of
     o /\ html <- runHook input newHooks
     H.modify_ _ { hooks = Right o, html = html }
   Receive input ->
-    when (options.receiveInput) do
+    when receiveInput do
       { hooks } <- H.get
       o /\ html <- runHook input hooks
       H.modify_ _ { input = input, hooks = Right o, html = html }
+  Finalize -> do
+    { hooks } <- H.get
+    case hooks of
+      Left _ -> pure unit
+      Right r -> lift (finalize r)
   where
   runHook ::
     input ->
@@ -219,16 +227,34 @@ handleAction options f = case _ of
       ({ | o } /\ HookHTML input slots m o)
   runHook input hooks = unIndexedHookF (f input) hooks
 
-type Options
+type Options :: forall k1 k2 k3 k4. Row Type -> (Type -> Type) -> k1 -> k2 -> k3 -> k4 -> (Type -> Type) -> Type
+type Options o query state action slots output m
   = { receiveInput :: Boolean
+    , handleQuery :: forall a. { | o } -> query a -> m (Maybe ({ | o } /\ a))
+    , finalize :: { | o } -> m Unit
     }
 
-defaultOptions :: Options
-defaultOptions = { receiveInput: false }
+defaultOptions ::
+  forall o query state action slots output m.
+  Applicative m => Options o query state action slots output m
+defaultOptions =
+  { receiveInput: false
+  , handleQuery: \_ _ -> pure Nothing
+  , finalize: \_ -> pure unit
+  }
 
 component ::
   forall slots o query input output m.
-  Options ->
+  Monad m =>
+  Options o query
+    { hooks :: Either {} { | o }
+    , input :: input
+    , html :: HookHTML input slots m o
+    }
+    (Action input slots m o)
+    slots
+    output
+    m ->
   HookM input
     { hooks :: Either {} { | o }
     , input :: input
@@ -240,9 +266,27 @@ component ::
     m
     o ->
   H.Component query input output m
-component o f =
+component options f =
   H.mkComponent
     { initialState: \input -> { input, hooks: Left {}, html: HH.div [] [] }
     , render: \{ html } -> html
-    , eval: H.mkEval H.defaultEval { initialize = Just Initialize, handleAction = handleAction o f }
+    , eval:
+        H.mkEval
+          { initialize: Just Initialize
+          , finalize: Just Finalize
+          , receive: Just <<< Receive
+          , handleAction: handleAction options f
+          , handleQuery:
+              \query -> do
+                { hooks } <- H.get
+                case hooks of
+                  Left _ -> pure Nothing
+                  Right o -> do
+                    lifted <- lift (options.handleQuery o query)
+                    case lifted of
+                      Nothing -> pure Nothing
+                      Just (newHooks /\ val) -> do
+                        H.modify_ _ { hooks = Right newHooks }
+                        pure (Just val)
+          }
     }
