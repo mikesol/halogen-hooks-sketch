@@ -1,4 +1,13 @@
-module App.Hooks (IndexedHookF, HookF, hook, component, Action, modify) where
+module App.Hooks
+  ( IndexedHookF
+  , HookF
+  , hook
+  , component
+  , Action
+  , modify
+  , hookEffect
+  , hookAff
+  ) where
 
 import Prelude
 import Control.Applicative.Indexed (class IxApplicative, iapply, ipure)
@@ -12,7 +21,10 @@ import Data.Symbol (class IsSymbol)
 import Data.Tuple (fst, snd)
 import Data.Tuple.Nested (type (/\), (/\))
 import Data.Variant (Variant)
+import Effect (Effect)
+import Effect.Aff (Aff)
 import Halogen as H
+import Halogen.HTML as HH
 import Halogen.HTML.Core as HC
 import Meeshkan.Variant (setViaVariant)
 import Prim.Row (class Lacks, class Cons)
@@ -25,117 +37,196 @@ data HookF a
 
 derive instance functorHookF :: Functor HookF
 
-newtype IndexedHookF (i :: Row Type) (o :: Row Type) a
-  = IndexedHookF (Either { | i } { | o } -> ({ | o } /\ a))
+newtype IndexedHookF state action slots output m (i :: Row Type) (o :: Row Type) a
+  = IndexedHookF (Either { | i } { | o } -> H.HalogenM state action slots output m ({ | o } /\ a))
 
-unIndexedHookF :: forall i o a. IndexedHookF i o a -> Either { | i } { | o } -> ({ | o } /\ a)
+unIndexedHookF :: forall state action slots output m i o a. IndexedHookF state action slots output m i o a -> Either { | i } { | o } -> H.HalogenM state action slots output m ({ | o } /\ a)
 unIndexedHookF (IndexedHookF a) = a
 
-derive instance freeHookFFunctor :: Functor (IndexedHookF i i)
+derive instance indexedHookFFunctor :: Functor (IndexedHookF state action slots output m i i)
 
-instance freeHookFApply :: Apply (IndexedHookF i i) where
+instance indexedHookFApply :: Apply (IndexedHookF state action slots output m i i) where
   apply = iapply
 
-instance freeHookFBind :: Bind (IndexedHookF i i) where
+instance indexedHookFBind :: Bind (IndexedHookF state action slots output m i i) where
   bind = ibind
 
-instance freeHookFApplicative :: Applicative (IndexedHookF i i) where
+instance indexedHookFApplicative :: Applicative (IndexedHookF state action slots output m i i) where
   pure = ipure
 
-instance freeHookFMonad :: Monad (IndexedHookF i i)
+instance indexedHookFMonad :: Monad (IndexedHookF state action slots output m i i)
 
-instance freeHookFIxFunctor :: IxFunctor IndexedHookF where
-  imap f (IndexedHookF a) = IndexedHookF ((map <<< map) f a)
+instance indexedHookFIxFunctor :: IxFunctor (IndexedHookF state action slots output m) where
+  imap f (IndexedHookF a) = IndexedHookF ((map <<< map <<< map) f a)
 
-instance freeHookFIxApplicative :: IxApply IndexedHookF where
+instance indexedHookFIxApplicative :: IxApply (IndexedHookF state action slots output m) where
   iapply = iap
 
-instance freeHookFIxApply :: IxApplicative IndexedHookF where
+instance indexedHookFIxApply :: IxApplicative (IndexedHookF state action slots output m) where
   ipure a =
     IndexedHookF \i ->
-      ( case i of
-          Left l -> l
-          Right r -> r
-      )
+      pure
+        $ ( case i of
+              Left l -> l
+              Right r -> r
+          )
         /\ a
 
-instance freeHookFIxBind :: IxBind IndexedHookF where
+instance indexedHookFIxBind :: IxBind (IndexedHookF state action slots output m) where
   ibind (IndexedHookF fmonad) function =
     -- we use unsafe coerce because we can only ever add hooks
     -- so the right case will guaranteed to contain the values we need
-    IndexedHookF \i ->
-      let
-        m /\ res =
-          fmonad
-            ( case i of
-                Left l -> Left l
-                Right r -> Right (unsafeCoerce r)
-            )
-      in
-        (unIndexedHookF (function res))
+    IndexedHookF \i -> do
+      m /\ res <-
+        fmonad
           ( case i of
-              Left _ -> Left m
-              Right _ -> Right (unsafeCoerce m)
+              Left l -> Left l
+              Right r -> Right (unsafeCoerce r)
           )
+      (unIndexedHookF (function res))
+        ( case i of
+            Left _ -> Left m
+            Right _ -> Right (unsafeCoerce m)
+        )
 
-instance freeHookFIxMonad :: IxMonad IndexedHookF
+instance indexedHookFIxMonad :: IxMonad (IndexedHookF state action slots output m)
 
 hook ::
-  forall proxy sym v i o.
+  forall state action slots output m proxy sym v i o.
   IsSymbol sym =>
   Lacks sym i =>
   Cons sym v i o =>
   proxy sym ->
   v ->
-  IndexedHookF i o v
+  IndexedHookF state action slots output m i o v
 hook _ v =
   IndexedHookF
     ( \io ->
-        ( case io of
-            Left i -> Record.insert (Proxy :: _ sym) v i
-            Right o -> o
-        )
+        pure
+          $ ( case io of
+                Left i -> Record.insert (Proxy :: _ sym) v i
+                Right o -> o
+            )
           /\ ( case io of
                 Left _ -> v
                 Right o -> Record.get (Proxy :: _ sym) o
             )
     )
 
+hookEffect ::
+  forall state action slots output proxy sym v i o.
+  IsSymbol sym =>
+  Lacks sym i =>
+  Cons sym v i o =>
+  proxy sym ->
+  Effect v ->
+  IndexedHookF state action slots output Effect i o v
+hookEffect px v' =
+  IndexedHookF
+    ( \io -> do
+        v <- H.liftEffect v'
+        (unIndexedHookF (hook px v)) io
+    )
+
+hookAff ::
+  forall state action slots output proxy sym v i o.
+  IsSymbol sym =>
+  Lacks sym i =>
+  Cons sym v i o =>
+  proxy sym ->
+  Aff v ->
+  IndexedHookF state action slots output Aff i o v
+hookAff px v' =
+  IndexedHookF
+    ( \io -> do
+        v <- H.liftAff v'
+        (unIndexedHookF (hook px v)) io
+    )
+
+data Action :: forall k1 k2 k3. k1 -> k2 -> k3 -> Row Type -> Type
 data Action input slots m o
-  = Initialize (HookM input slots m o)
+  = Initialize
   | Modify (Variant o)
 
 modify :: forall input slots m o. Variant o -> Action input slots m o
 modify = Modify
 
-type HookM input slots m o
+type HookHTML :: forall k. k -> Row Type -> (Type -> Type) -> Row Type -> Type
+type HookHTML input slots m o
+  = HC.HTML (H.ComponentSlot slots m (Action input slots m o)) (Action input slots m o)
+
+type HookM input state action slots output m o
   = input ->
-    IndexedHookF () o (HC.HTML (H.ComponentSlot slots m (Action input slots m o)) (Action input slots m o))
+    IndexedHookF state action slots output m () o (HookHTML input slots m o)
 
 handleAction ::
-  forall input o slots output m.
+  forall input slots output m o.
+  HookM input
+    { hooks :: Either {} { | o }
+    , input :: input
+    , html :: HookHTML input slots m o
+    }
+    (Action input slots m o)
+    slots
+    output
+    m
+    o ->
   Action input slots m o ->
-  H.HalogenM { hooks :: Either {} { | o }, input :: input } (Action input slots m o) slots output m Unit
-handleAction = case _ of
-  Initialize h -> H.modify_ (\i -> i { hooks = Right (fst ((unIndexedHookF (h i.input)) (Left {}))) })
+  H.HalogenM
+    { hooks :: Either {} { | o }
+    , input :: input
+    , html :: HookHTML input slots m o
+    }
+    (Action input slots m o)
+    slots
+    output
+    m
+    Unit
+handleAction f = case _ of
+  Initialize -> do
+    { input } <- H.get
+    ival <- runHook input (Left {})
+    H.modify_ _ { hooks = Right (fst ival), html = snd ival }
   Modify v -> do
-    H.modify_
-      ( \i ->
-          i
-            { hooks =
-              case i.hooks of
-                Left l -> Left l
-                Right r -> Right (setViaVariant v r)
-            }
-      )
+    { input, hooks } <- H.get
+    let
+      newHooks = case hooks of
+        Left l -> Left l
+        Right r -> Right (setViaVariant v r)
+    _ /\ html <- runHook input newHooks
+    H.modify_ _ { hooks = newHooks, html = html }
+  where
+  runHook ::
+    input ->
+    Either {} { | o } ->
+    H.HalogenM
+      { hooks :: Either {} { | o }
+      , input :: input
+      , html :: HookHTML input slots m o
+      }
+      (Action input slots m o)
+      slots
+      output
+      m
+      ({ | o } /\ HookHTML input slots m o)
+  runHook input hooks = unIndexedHookF (f input) hooks
 
 component ::
   forall slots o query input output m.
-  HookM input slots m o ->
+  HookM input
+    { hooks :: Either {} { | o }
+    , input :: input
+    , html :: HookHTML input slots m o
+    }
+    (Action input slots m o)
+    slots
+    output
+    m
+    o ->
   H.Component query input output m
 component f =
   H.mkComponent
-    { initialState: \input -> { input, hooks: Left {} }
-    , render: \{ input, hooks } -> snd (unIndexedHookF (f input) hooks)
-    , eval: H.mkEval H.defaultEval { initialize = Just (Initialize f), handleAction = handleAction }
+    { initialState: \input -> { input, hooks: Left {}, html: HH.div [] [] }
+    , render: \{ html } -> html
+    , eval: H.mkEval H.defaultEval { initialize = Just Initialize, handleAction = handleAction f }
     }
