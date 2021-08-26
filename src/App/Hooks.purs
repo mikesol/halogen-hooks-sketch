@@ -15,16 +15,19 @@ module App.Hooks
   , mapOutput
   , hoist
   , component
+  , getHooks
   , Action
   , HookM
   , set
   , setM
   , setMWithHooks
+  , setHookAfterInitialize
   , modify
   , defaultOptions
   , Options
   , ReadOnly(..)
   , class NotReadOnly
+  , HookHTML
   ) where
 
 import Prelude
@@ -39,7 +42,6 @@ import Control.Monad.Trans.Class (class MonadTrans)
 import Control.Monad.Writer.Class (class MonadTell)
 import Control.Parallel.Class (class Parallel, parallel, sequential)
 import Data.Either (Either(..), hush)
-import Data.Foldable (for_)
 import Data.Functor.Indexed (class IxFunctor)
 import Data.Map (Map)
 import Data.Maybe (Maybe(..), fromJust)
@@ -367,8 +369,6 @@ data Action emittedValue o input slots output m
   | Receive input
   | Finalize
 
-class NotReadOnly (a :: Type)
-
 unsafeHooks ::
   forall emittedValue o input slots output m.
   HookM emittedValue o input slots output m { | o }
@@ -376,6 +376,23 @@ unsafeHooks =
   HookM do
     { hooks } <- H.get
     pure (unsafePartial (fromJust (hush hooks)))
+
+setHookAfterInitialize ::
+  forall proxy emittedValue output input slots m sym a r1 o.
+  NotReadOnly a =>
+  Cons sym a r1 o =>
+  IsSymbol sym =>
+  proxy sym ->
+  a ->
+  HookM emittedValue o input slots output m Unit
+setHookAfterInitialize px a = HookM (H.modify_ \i -> i { hooks = setViaVariant (inj px a) <$> i.hooks })
+
+getHooks ::
+  forall emittedValue o input slots output m.
+  HookM emittedValue o input slots output m (Maybe { | o })
+getHooks = HookM (hush <$> H.gets _.hooks)
+
+class NotReadOnly (a :: Type)
 
 instance readOnlyFail :: Fail (Text "This value is read only") => NotReadOnly (ReadOnly a)
 else instance readOnlySucceed :: NotReadOnly a
@@ -429,8 +446,8 @@ type HookArg emittedValue input slots output m o
 
 handleAction ::
   forall r emittedValue input slots output m o.
-  { finalize :: { | o } -> HookM emittedValue o input slots output m Unit
-  , handleEmittedValue :: { | o } -> emittedValue -> HookM emittedValue o input slots output m (Maybe { | o })
+  { finalize :: HookM emittedValue o input slots output m Unit
+  , handleEmittedValue :: emittedValue -> HookM emittedValue o input slots output m Unit
   | r
   } ->
   HookArg emittedValue input slots output m o ->
@@ -464,20 +481,8 @@ handleAction { handleEmittedValue, finalize } f = case _ of
     { hooks } <- H.get
     o /\ html <- runHook input hooks
     H.modify_ _ { input = input, hooks = Right o, html = html }
-  Finalize -> do
-    { hooks } <- H.get
-    case hooks of
-      Left _ -> pure unit
-      Right r -> let HookM done = finalize r in done
-  Emit emittedValue -> do
-    { hooks } <- H.get
-    case hooks of
-      Left _ -> pure unit
-      Right r ->
-        let
-          HookM newHooks = handleEmittedValue r emittedValue
-        in
-          newHooks >>= flip for_ \newHooks' -> H.modify_ _ { hooks = Right newHooks' }
+  Finalize -> let HookM done = finalize in done
+  Emit emittedValue -> let HookM handled = handleEmittedValue emittedValue in handled
   where
   runHook ::
     input ->
@@ -496,9 +501,10 @@ handleAction { handleEmittedValue, finalize } f = case _ of
 
 type Options query emittedValue o input slots output m
   = { receiveInput :: Boolean
-    , handleQuery :: forall a. { | o } -> query a -> HookM emittedValue o input slots output m (Maybe { | o } /\ Maybe a)
-    , handleEmittedValue :: { | o } -> emittedValue -> HookM emittedValue o input slots output m (Maybe { | o })
-    , finalize :: { | o } -> HookM emittedValue o input slots output m Unit
+    , handleQuery :: forall a. query a -> HookM emittedValue o input slots output m (Maybe a)
+    , handleEmittedValue :: emittedValue -> HookM emittedValue o input slots output m Unit
+    , finalize :: HookM emittedValue o input slots output m Unit
+    , initialHTML :: HookHTML emittedValue o input slots output m
     }
 
 defaultOptions ::
@@ -506,9 +512,10 @@ defaultOptions ::
   Options query emittedValue o input slots output m
 defaultOptions =
   { receiveInput: false
-  , handleQuery: \_ _ -> pure (Nothing /\ Nothing)
-  , handleEmittedValue: \_ _ -> pure Nothing
-  , finalize: \_ -> pure unit
+  , handleQuery: \_ -> pure Nothing
+  , handleEmittedValue: \_ -> pure unit
+  , finalize: pure unit
+  , initialHTML: HH.div [] []
   }
 
 component ::
@@ -518,7 +525,7 @@ component ::
   H.Component query input output m
 component options f =
   H.mkComponent
-    { initialState: \input -> { input, hooks: Left {}, html: HH.div [] [] }
+    { initialState: \input -> { input, hooks: Left {}, html: options.initialHTML }
     , render: \{ html } -> html
     , eval:
         H.mkEval
@@ -527,13 +534,6 @@ component options f =
           , receive: if options.receiveInput then Just <<< Receive else const Nothing
           , handleAction: handleAction options f
           , handleQuery:
-              \q -> do
-                { hooks } <- H.get
-                case hooks of
-                  Left _ -> pure Nothing
-                  Right o -> do
-                    newHooks /\ val <- let HookM res = options.handleQuery o q in res
-                    for_ newHooks \newHooks' -> H.modify_ _ { hooks = Right newHooks' }
-                    pure val
+              \q -> let HookM res = options.handleQuery q in res
           }
     }
