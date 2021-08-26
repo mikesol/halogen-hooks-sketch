@@ -28,14 +28,14 @@ component =
   Hooks.component Hooks.defaultOptions \_ -> Ix.do
     foo <- Hooks.hook (Proxy :: _ "foo") 0
     { bar, baz } <-
-      if foo `mod` 2 == 0 then Ix.do
+      if foo `mod` 2 == 0 then Ix.ado
         bar <- Hooks.hook (Proxy :: _ "bar") 0
         baz <- Hooks.hook (Proxy :: _ "baz") 0
-        ipure { bar, baz }
-      else Ix.do
+        in { bar, baz }
+      else Ix.ado
         baz <- Hooks.hook (Proxy :: _ "baz") 0
         bar <- Hooks.hook (Proxy :: _ "bar") 0
-        ipure { bar, baz }
+        in { bar, baz }
     ipure
       ( HH.div_
           [ HH.p_
