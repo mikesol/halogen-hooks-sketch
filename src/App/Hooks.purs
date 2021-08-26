@@ -19,6 +19,7 @@ module App.Hooks
   , HookM
   , set
   , setM
+  , setMWithHooks
   , defaultOptions
   , Options
   , ReadOnly(..)
@@ -26,7 +27,6 @@ module App.Hooks
   ) where
 
 import Prelude
-
 import Control.Applicative.Indexed (class IxApplicative, iapply, ipure)
 import Control.Apply.Indexed (class IxApply)
 import Control.Bind.Indexed (class IxBind, ibind)
@@ -37,11 +37,11 @@ import Control.Monad.Rec.Class (class MonadRec)
 import Control.Monad.Trans.Class (class MonadTrans)
 import Control.Monad.Writer.Class (class MonadTell)
 import Control.Parallel.Class (class Parallel, parallel, sequential)
-import Data.Either (Either(..))
+import Data.Either (Either(..), hush)
 import Data.Foldable (for_)
 import Data.Functor.Indexed (class IxFunctor)
 import Data.Map (Map)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (class Newtype)
 import Data.Symbol (class IsSymbol)
 import Data.Tuple.Nested (type (/\), (/\))
@@ -58,6 +58,7 @@ import Halogen.Query.HalogenM as HM
 import Halogen.Query.Input (RefLabel)
 import Halogen.Subscription as HS
 import Meeshkan.Variant (setViaVariant)
+import Partial.Unsafe (unsafePartial)
 import Prim.Row (class Lacks, class Cons)
 import Prim.Row as Row
 import Prim.TypeError (class Fail, Text)
@@ -213,7 +214,6 @@ kill fid = HookM (H.kill fid)
 getRef :: forall emittedValue o input slots output m. RefLabel -> HookM emittedValue o input slots output m (Maybe Element)
 getRef p = HookM (H.getRef p)
 
-
 mapOutput ::
   forall emittedValue o input slots output output' m.
   (output -> output') ->
@@ -362,34 +362,52 @@ hookM px (HookM v') =
 data Action emittedValue o input slots output m
   = Initialize
   | Emit emittedValue
-  | Modify (HookM emittedValue o input slots output m (Variant o))
+  | Modify (HookM emittedValue o input slots output m { | o } -> HookM emittedValue o input slots output m (Variant o))
   | Receive input
   | Finalize
 
 class NotReadOnly (a :: Type)
 
+unsafeHooks ::
+  forall emittedValue o input slots output m.
+  HookM emittedValue o input slots output m { | o }
+unsafeHooks =
+  HookM do
+    { hooks } <- H.get
+    pure (unsafePartial (fromJust (hush hooks)))
+
 instance readOnlyFail :: Fail (Text "This value is read only") => NotReadOnly (ReadOnly a)
 else instance readOnlySucceed :: NotReadOnly a
 
 set ::
-  forall proxy emittedValue input output slots m sym a r1 r2.
+  forall proxy emittedValue input output slots m sym a r1 o.
   NotReadOnly a =>
-  Cons sym a r1 r2 =>
+  Cons sym a r1 o =>
   IsSymbol sym =>
   proxy sym ->
   a ->
-  Action emittedValue r2 input slots output m
-set px = setM px <<< pure
+  Action emittedValue o input slots output m
+set px a = setM px (pure a)
 
 setM ::
-  forall proxy emittedValue output input slots m sym a r1 r2.
+  forall proxy emittedValue output input slots m sym a r1 o.
   NotReadOnly a =>
-  Cons sym a r1 r2 =>
+  Cons sym a r1 o =>
   IsSymbol sym =>
   proxy sym ->
-  HookM emittedValue r2 input slots output m a ->
-  Action emittedValue r2 input slots output m
-setM px v = Modify (inj px <$> v)
+  HookM emittedValue o input slots output m a ->
+  Action emittedValue o input slots output m
+setM px v = setMWithHooks px (pure v)
+
+setMWithHooks ::
+  forall proxy emittedValue output input slots m sym a r1 o.
+  NotReadOnly a =>
+  Cons sym a r1 o =>
+  IsSymbol sym =>
+  proxy sym ->
+  (HookM emittedValue o input slots output m { | o } -> HookM emittedValue o input slots output m a) ->
+  Action emittedValue o input slots output m
+setMWithHooks px v = Modify ((map <<< map) (inj px) v)
 
 type HookHTML emittedValue o input slots output m
   = HC.HTML (H.ComponentSlot slots m (Action emittedValue o input slots output m)) (Action emittedValue o input slots output m)
@@ -421,8 +439,8 @@ handleAction { handleEmittedValue, finalize } f = case _ of
     { input } <- H.get
     hooks /\ html <- runHook input (Left {})
     H.modify_ _ { hooks = Right hooks, html = html }
-  Modify (HookM v') -> do
-    v <- v'
+  Modify v' -> do
+    v <- let HookM v'' = v' unsafeHooks in v''
     { input, hooks } <- H.get
     o /\ html <-
       runHook input
