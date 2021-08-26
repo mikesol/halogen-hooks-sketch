@@ -2,11 +2,11 @@ module App.Hooks
   ( IndexedHookF
   , HookF
   , hook
+  , hookM
   , component
   , Action
   , modify
-  , hookEffect
-  , hookAff
+  , modifyM
   , defaultOptions
   , Options
   , ReadOnly(..)
@@ -26,8 +26,6 @@ import Data.Symbol (class IsSymbol)
 import Data.Tuple (fst, snd)
 import Data.Tuple.Nested (type (/\), (/\))
 import Data.Variant (Variant, inj)
-import Effect (Effect)
-import Effect.Aff (Aff)
 import Halogen (lift)
 import Halogen as H
 import Halogen.HTML as HH
@@ -127,40 +125,26 @@ hook _ v =
             )
     )
 
-hookEffect ::
-  forall state action slots output proxy sym v i o.
+hookM ::
+  forall state action slots output proxy sym m v i o.
+  Monad m =>
   IsSymbol sym =>
   Lacks sym i =>
   Cons sym v i o =>
   proxy sym ->
-  Effect v ->
-  IndexedHookF state action slots output Effect i o v
-hookEffect px v' =
+  m v ->
+  IndexedHookF state action slots output m i o v
+hookM px v' =
   IndexedHookF
     ( \io -> do
-        v <- H.liftEffect v'
+        v <- lift v'
         (unIndexedHookF (hook px v)) io
     )
 
-hookAff ::
-  forall state action slots output proxy sym v i o.
-  IsSymbol sym =>
-  Lacks sym i =>
-  Cons sym v i o =>
-  proxy sym ->
-  Aff v ->
-  IndexedHookF state action slots output Aff i o v
-hookAff px v' =
-  IndexedHookF
-    ( \io -> do
-        v <- H.liftAff v'
-        (unIndexedHookF (hook px v)) io
-    )
-
-data Action :: forall k1 k2. Type -> k1 -> k2 -> Row Type -> Type
+data Action :: forall k1. Type -> k1 -> (Type -> Type) -> Row Type -> Type
 data Action input slots m o
   = Initialize
-  | Modify (Variant o)
+  | Modify (m (Variant o))
   | Receive input
   | Finalize
 
@@ -171,13 +155,25 @@ else instance readOnlySucceed :: NotReadOnly a
 
 modify ::
   forall proxy input slots m sym a r1 r2.
+  Applicative m =>
   NotReadOnly a =>
   Cons sym a r1 r2 =>
   IsSymbol sym =>
   proxy sym ->
   a ->
   Action input slots m r2
-modify px v = Modify (inj px v)
+modify px = modifyM px <<< pure
+
+modifyM ::
+  forall proxy input slots m sym a r1 r2.
+  Functor m =>
+  NotReadOnly a =>
+  Cons sym a r1 r2 =>
+  IsSymbol sym =>
+  proxy sym ->
+  m a ->
+  Action input slots m r2
+modifyM px v = Modify (inj px <$> v)
 
 type HookHTML input slots m o
   = HC.HTML (H.ComponentSlot slots m (Action input slots m o)) (Action input slots m o)
@@ -216,7 +212,8 @@ handleAction { receiveInput, finalize } f = case _ of
     { input } <- H.get
     ival <- runHook input (Left {})
     H.modify_ _ { hooks = Right (fst ival), html = snd ival }
-  Modify v -> do
+  Modify v' -> do
+    v <- lift v'
     { input, hooks } <- H.get
     o /\ html <-
       runHook input

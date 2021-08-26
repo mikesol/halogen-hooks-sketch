@@ -1,7 +1,6 @@
 module App.Button where
 
 import Prelude
-
 import App.Hooks as Hooks
 import Control.Applicative.Indexed (ipure)
 import Control.Monad.Indexed.Qualified as Ix
@@ -17,20 +16,23 @@ type State
 data Action
   = Increment
 
-affy0 :: Aff Int
-affy0 = pure 0
+aff0 :: Aff Int
+aff0 = pure 0
+
+affAdd1 :: Int -> Aff Int
+affAdd1 = pure <<< add 1
 
 component :: forall q i o. H.Component q i o Aff
 component =
   Hooks.component Hooks.defaultOptions \_ -> Ix.do
     foo <- Hooks.hook (Proxy :: _ "foo") 0
-    bar <- Hooks.hookAff (Proxy :: _ "bar") affy0
+    bar <- Hooks.hookM (Proxy :: _ "bar") aff0
     ipure
       ( HH.div_
           [ HH.p_
               [ HH.text $ "Foo: " <> show foo <> " Bar: " <> show bar ]
           , HH.button
-              [ HE.onClick \_ -> Hooks.modify (Proxy :: _ "foo") (foo + 1) ]
+              [ HE.onClick \_ -> Hooks.modifyM (Proxy :: _ "foo") (affAdd1 foo) ]
               [ HH.text "Incr foo" ]
           , HH.button
               [ HE.onClick \_ -> Hooks.modify (Proxy :: _ "bar") (bar + 1) ]
