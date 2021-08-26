@@ -7,6 +7,8 @@ module App.Hooks
   , modify
   , hookEffect
   , hookAff
+  , defaultOptions
+  , Options
   ) where
 
 import Prelude
@@ -143,15 +145,15 @@ hookAff px v' =
         (unIndexedHookF (hook px v)) io
     )
 
-data Action :: forall k1 k2 k3. k1 -> k2 -> k3 -> Row Type -> Type
+data Action :: forall k1 k2. Type -> k1 -> k2 -> Row Type -> Type
 data Action input slots m o
   = Initialize
   | Modify (Variant o)
+  | Receive input
 
 modify :: forall input slots m o. Variant o -> Action input slots m o
 modify = Modify
 
-type HookHTML :: forall k. k -> Row Type -> (Type -> Type) -> Row Type -> Type
 type HookHTML input slots m o
   = HC.HTML (H.ComponentSlot slots m (Action input slots m o)) (Action input slots m o)
 
@@ -161,6 +163,7 @@ type HookM input state action slots output m o
 
 handleAction ::
   forall input slots output m o.
+  Options ->
   HookM input
     { hooks :: Either {} { | o }
     , input :: input
@@ -182,7 +185,7 @@ handleAction ::
     output
     m
     Unit
-handleAction f = case _ of
+handleAction options f = case _ of
   Initialize -> do
     { input } <- H.get
     ival <- runHook input (Left {})
@@ -193,8 +196,13 @@ handleAction f = case _ of
       newHooks = case hooks of
         Left l -> Left l
         Right r -> Right (setViaVariant v r)
-    _ /\ html <- runHook input newHooks
-    H.modify_ _ { hooks = newHooks, html = html }
+    o /\ html <- runHook input newHooks
+    H.modify_ _ { hooks = Right o, html = html }
+  Receive input ->
+    when (options.receiveInput) do
+      { hooks } <- H.get
+      o /\ html <- runHook input hooks
+      H.modify_ _ { input = input, hooks = Right o, html = html }
   where
   runHook ::
     input ->
@@ -211,8 +219,16 @@ handleAction f = case _ of
       ({ | o } /\ HookHTML input slots m o)
   runHook input hooks = unIndexedHookF (f input) hooks
 
+type Options
+  = { receiveInput :: Boolean
+    }
+
+defaultOptions :: Options
+defaultOptions = { receiveInput: false }
+
 component ::
   forall slots o query input output m.
+  Options ->
   HookM input
     { hooks :: Either {} { | o }
     , input :: input
@@ -224,9 +240,9 @@ component ::
     m
     o ->
   H.Component query input output m
-component f =
+component o f =
   H.mkComponent
     { initialState: \input -> { input, hooks: Left {}, html: HH.div [] [] }
     , render: \{ html } -> html
-    , eval: H.mkEval H.defaultEval { initialize = Just Initialize, handleAction = handleAction f }
+    , eval: H.mkEval H.defaultEval { initialize = Just Initialize, handleAction = handleAction o f }
     }

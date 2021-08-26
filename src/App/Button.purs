@@ -1,6 +1,7 @@
 module App.Button where
 
 import Prelude
+
 import App.Hooks as Hooks
 import Control.Applicative.Indexed (ipure)
 import Control.Monad.Indexed.Qualified as Ix
@@ -22,7 +23,7 @@ affy0 = pure 0
 
 component :: forall q i o. H.Component q i o Aff
 component =
-  Hooks.component \_ -> Ix.do
+  Hooks.component Hooks.defaultOptions \_ -> Ix.do
     foo <- Hooks.hook (Proxy :: _ "foo") 0
     bar <- Hooks.hookAff (Proxy :: _ "bar") affy0
     ipure
