@@ -20,6 +20,7 @@ module App.Hooks
   , set
   , setM
   , setMWithHooks
+  , modify
   , defaultOptions
   , Options
   , ReadOnly(..)
@@ -27,6 +28,7 @@ module App.Hooks
   ) where
 
 import Prelude
+
 import Control.Applicative.Indexed (class IxApplicative, iapply, ipure)
 import Control.Apply.Indexed (class IxApply)
 import Control.Bind.Indexed (class IxBind, ibind)
@@ -408,6 +410,18 @@ setMWithHooks ::
   (HookM emittedValue o input slots output m { | o } -> HookM emittedValue o input slots output m a) ->
   Action emittedValue o input slots output m
 setMWithHooks px v = Modify ((map <<< map) (inj px) v)
+
+modify ::
+  forall proxy emittedValue output input slots m sym a r1 o.
+  NotReadOnly a =>
+  Cons sym a r1 o =>
+  IsSymbol sym =>
+  proxy sym ->
+  (a -> a) ->
+  Action emittedValue o input slots output m
+modify px f = setMWithHooks px (\m -> do
+  o <- m
+  pure (f (Record.get (Proxy :: _ sym) o)))
 
 type HookHTML emittedValue o input slots output m
   = HC.HTML (H.ComponentSlot slots m (Action emittedValue o input slots output m)) (Action emittedValue o input slots output m)
