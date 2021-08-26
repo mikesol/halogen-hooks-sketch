@@ -24,7 +24,6 @@ import Data.Functor.Indexed (class IxFunctor)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (class IsSymbol)
-import Data.Tuple (fst, snd)
 import Data.Tuple.Nested (type (/\), (/\))
 import Data.Variant (Variant, inj)
 import Halogen (lift)
@@ -211,8 +210,8 @@ handleAction ::
 handleAction { finalize } f = case _ of
   Initialize -> do
     { input } <- H.get
-    ival <- runHook input (Left {})
-    H.modify_ _ { hooks = Right (fst ival), html = snd ival }
+    hooks /\ html <- runHook input (Left {})
+    H.modify_ _ { hooks = Right hooks, html = html }
   Modify v' -> do
     v <- lift v'
     { input, hooks } <- H.get
