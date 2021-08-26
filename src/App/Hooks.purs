@@ -19,6 +19,7 @@ import Control.Apply.Indexed (class IxApply)
 import Control.Bind.Indexed (class IxBind, ibind)
 import Control.Monad.Indexed (class IxMonad, iap)
 import Data.Either (Either(..))
+import Data.Foldable (for_)
 import Data.Functor.Indexed (class IxFunctor)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
@@ -250,7 +251,7 @@ handleAction { finalize } f = case _ of
 type Options :: forall k1 k2 k3 k4. Row Type -> (Type -> Type) -> k1 -> k2 -> k3 -> k4 -> (Type -> Type) -> Type
 type Options o query state action slots output m
   = { receiveInput :: Boolean
-    , handleQuery :: forall a. { | o } -> query a -> m (Maybe ({ | o } /\ a))
+    , handleQuery :: forall a. { | o } -> query a -> m (Maybe (Maybe { | o } /\ a))
     , finalize :: { | o } -> m Unit
     }
 
@@ -306,7 +307,7 @@ component options f =
                     case lifted of
                       Nothing -> pure Nothing
                       Just (newHooks /\ val) -> do
-                        H.modify_ _ { hooks = Right newHooks }
+                        for_ newHooks \newHooks' -> H.modify_ _ { hooks = Right newHooks' }
                         pure (Just val)
           }
     }
