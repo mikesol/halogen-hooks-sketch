@@ -251,7 +251,7 @@ handleAction { finalize } f = case _ of
 type Options :: forall k1 k2 k3 k4. Row Type -> (Type -> Type) -> k1 -> k2 -> k3 -> k4 -> (Type -> Type) -> Type
 type Options o query state action slots output m
   = { receiveInput :: Boolean
-    , handleQuery :: forall a. { | o } -> query a -> m (Maybe (Maybe { | o } /\ a))
+    , handleQuery :: forall a. { | o } -> query a -> m (Maybe { | o } /\ Maybe a)
     , finalize :: { | o } -> m Unit
     }
 
@@ -260,7 +260,7 @@ defaultOptions ::
   Applicative m => Options o query state action slots output m
 defaultOptions =
   { receiveInput: false
-  , handleQuery: \_ _ -> pure Nothing
+  , handleQuery: \_ _ -> pure (Nothing /\ Nothing)
   , finalize: \_ -> pure unit
   }
 
@@ -303,11 +303,8 @@ component options f =
                 case hooks of
                   Left _ -> pure Nothing
                   Right o -> do
-                    lifted <- lift (options.handleQuery o query)
-                    case lifted of
-                      Nothing -> pure Nothing
-                      Just (newHooks /\ val) -> do
-                        for_ newHooks \newHooks' -> H.modify_ _ { hooks = Right newHooks' }
-                        pure (Just val)
+                    newHooks /\ val <- lift (options.handleQuery o query)
+                    for_ newHooks \newHooks' -> H.modify_ _ { hooks = Right newHooks' }
+                    pure val
           }
     }
