@@ -7,6 +7,7 @@
   , "halogen"
   , "indexed-monad"
   , "maybe"
+  , "profunctor-lenses"
   , "psci-support"
   , "record"
   , "variant"
