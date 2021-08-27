@@ -14,6 +14,7 @@ module App.Hooks
   , mapOutput
   , hoist
   , component
+  , capture
   , getHooks
   , lift
   , Action
@@ -26,6 +27,7 @@ module App.Hooks
   , defaultOptions
   , Options
   , ReadOnly(..)
+  , class GetLexicalLast
   , class NotReadOnly
   , class HedgeHooks
   , class HedgeHooksRL
@@ -35,11 +37,13 @@ module App.Hooks
   ) where
 
 import Prelude
-import Control.Applicative.Indexed (class IxApplicative, iapply, ipure)
+
+import Control.Applicative.Indexed (class IxApplicative, iapply, ipure, iwhen)
 import Control.Apply.Indexed (class IxApply)
 import Control.Bind.Indexed (class IxBind, ibind)
 import Control.Monad.Error.Class (class MonadThrow)
 import Control.Monad.Indexed (class IxMonad, iap)
+import Control.Monad.Indexed.Qualified as Ix
 import Control.Monad.Reader.Class (class MonadAsk)
 import Control.Monad.Rec.Class (class MonadRec)
 import Control.Monad.Trans.Class (class MonadTrans)
@@ -70,6 +74,7 @@ import Prim.Row (class Cons, class Lacks)
 import Prim.Row as Row
 import Prim.RowList (class RowToList)
 import Prim.RowList as RL
+import Prim.Symbol as Symbol
 import Prim.TypeError (class Fail, Text)
 import Record as Record
 import Type.Proxy (Proxy(..))
@@ -280,6 +285,31 @@ lift ::
   HookM hedgedHooks hooks emittedValue input slots output m v ->
   IndexedHookM hedgedHooks hooks emittedValue input slots output m i i v
 lift = IndexedHookM
+
+class GetLexicalLast (default :: Symbol) (i :: RL.RowList Type) (s :: Symbol) | default i -> s
+
+instance getLexicalLastNil :: GetLexicalLast sym RL.Nil sym
+
+instance getLexicalLastCons :: GetLexicalLast sym rest o => GetLexicalLast prev (RL.Cons sym val rest) o
+
+capture ::
+  forall iRL sym' hedgedHooks' hedgedHooks hooks emittedValue input slots output m sym v i o.
+  RL.RowToList i iRL =>
+  GetLexicalLast "" iRL sym' =>
+  Symbol.Append sym' "_" sym =>
+  IsSymbol sym =>
+  Lacks sym i =>
+  Cons sym v i o =>
+  Cons sym (Maybe (First (v))) hedgedHooks' hedgedHooks =>
+  Eq v =>
+  v ->
+  HookM hedgedHooks hooks emittedValue input slots output m Unit ->
+  IndexedHookM hedgedHooks hooks emittedValue input slots output m i o Unit
+capture v m = Ix.do
+  prev <- hook px v
+  iwhen (prev /= v) (lift (setHook px v *> m))
+  where
+  px = Proxy :: _ sym
 
 hook ::
   forall hedgedHooks' hedgedHooks hooks emittedValue input slots output m proxy sym v i o.
