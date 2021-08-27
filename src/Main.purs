@@ -2,7 +2,7 @@ module Main where
 
 import Prelude
 
-import App.Button as Button
+import App.Capture as Button
 import Effect (Effect)
 import Halogen.Aff as HA
 import Halogen.VDom.Driver (runUI)
