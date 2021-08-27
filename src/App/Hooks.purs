@@ -76,104 +76,104 @@ import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 import Web.DOM (Element)
 
-newtype HookM emittedValue hedgedHooks hooks input slots output m a
+newtype HookM hedgedHooks hooks emittedValue input slots output m a
   = HookM
   ( H.HalogenM
       { hooks :: { | hedgedHooks }
       , input :: input
-      , html :: HookHTML emittedValue hedgedHooks hooks input slots output m
+      , html :: HookHTML hedgedHooks hooks emittedValue input slots output m
       }
-      (Action emittedValue hedgedHooks hooks input slots output m)
+      (Action hedgedHooks hooks emittedValue input slots output m)
       slots
       output
       m
       a
   )
 
-derive newtype instance functorHookM :: Functor (HookM emittedValue hedgedHooks hooks input slots output m)
+derive newtype instance functorHookM :: Functor (HookM hedgedHooks hooks emittedValue input slots output m)
 
-derive newtype instance applyHookM :: Apply (HookM emittedValue hedgedHooks hooks input slots output m)
+derive newtype instance applyHookM :: Apply (HookM hedgedHooks hooks emittedValue input slots output m)
 
-derive newtype instance applicativeHookM :: Applicative (HookM emittedValue hedgedHooks hooks input slots output m)
+derive newtype instance applicativeHookM :: Applicative (HookM hedgedHooks hooks emittedValue input slots output m)
 
-derive newtype instance bindHookM :: Bind (HookM emittedValue hedgedHooks hooks input slots output m)
+derive newtype instance bindHookM :: Bind (HookM hedgedHooks hooks emittedValue input slots output m)
 
-derive newtype instance monadHookM :: Monad (HookM emittedValue hedgedHooks hooks input slots output m)
+derive newtype instance monadHookM :: Monad (HookM hedgedHooks hooks emittedValue input slots output m)
 
-derive newtype instance semigroupHookM :: Semigroup a => Semigroup (HookM emittedValue hedgedHooks hooks input slots output m a)
+derive newtype instance semigroupHookM :: Semigroup a => Semigroup (HookM hedgedHooks hooks emittedValue input slots output m a)
 
-derive newtype instance monoidHookM :: Monoid a => Monoid (HookM emittedValue hedgedHooks hooks input slots output m a)
+derive newtype instance monoidHookM :: Monoid a => Monoid (HookM hedgedHooks hooks emittedValue input slots output m a)
 
-derive newtype instance monadEffectHookM :: MonadEffect m => MonadEffect (HookM emittedValue hedgedHooks hooks input slots output m)
+derive newtype instance monadEffectHookM :: MonadEffect m => MonadEffect (HookM hedgedHooks hooks emittedValue input slots output m)
 
-derive newtype instance monadAffHookM :: MonadAff m => MonadAff (HookM emittedValue hedgedHooks hooks input slots output m)
+derive newtype instance monadAffHookM :: MonadAff m => MonadAff (HookM hedgedHooks hooks emittedValue input slots output m)
 
-instance parallelHookM :: Parallel (HookAp emittedValue hedgedHooks hooks input slots output m) (HookM emittedValue hedgedHooks hooks input slots output m) where
+instance parallelHookM :: Parallel (HookAp hedgedHooks hooks emittedValue input slots output m) (HookM hedgedHooks hooks emittedValue input slots output m) where
   parallel (HookM a) = HookAp (parallel a)
   sequential (HookAp a) = HookM (sequential a)
 
-instance monadTransHookM :: MonadTrans (HookM emittedValue hedgedHooks hooks input slots output) where
+instance monadTransHookM :: MonadTrans (HookM hedgedHooks hooks emittedValue input slots output) where
   lift = HookM <<< H.lift
 
-derive newtype instance monadRecHookM :: MonadRec (HookM emittedValue hedgedHooks hooks input slots output m)
+derive newtype instance monadRecHookM :: MonadRec (HookM hedgedHooks hooks emittedValue input slots output m)
 
-derive newtype instance monadAskHookM :: MonadAsk r m => MonadAsk r (HookM emittedValue hedgedHooks hooks input slots output m)
+derive newtype instance monadAskHookM :: MonadAsk r m => MonadAsk r (HookM hedgedHooks hooks emittedValue input slots output m)
 
-derive newtype instance monadTellHookM :: MonadTell w m => MonadTell w (HookM emittedValue hedgedHooks hooks input slots output m)
+derive newtype instance monadTellHookM :: MonadTell w m => MonadTell w (HookM hedgedHooks hooks emittedValue input slots output m)
 
-derive newtype instance monadThrowHookM :: MonadThrow e m => MonadThrow e (HookM emittedValue hedgedHooks hooks input slots output m)
+derive newtype instance monadThrowHookM :: MonadThrow e m => MonadThrow e (HookM hedgedHooks hooks emittedValue input slots output m)
 
 -- | An applicative-only version of `HalogenM` to allow for parallel evaluation.
-newtype HookAp emittedValue hedgedHooks hooks input slots output m a
+newtype HookAp hedgedHooks hooks emittedValue input slots output m a
   = HookAp
   ( HalogenAp
       { hooks :: { | hedgedHooks }
       , input :: input
-      , html :: HookHTML emittedValue hedgedHooks hooks input slots output m
+      , html :: HookHTML hedgedHooks hooks emittedValue input slots output m
       }
-      (Action emittedValue hedgedHooks hooks input slots output m)
+      (Action hedgedHooks hooks emittedValue input slots output m)
       slots
       output
       m
       a
   )
 
-derive instance newtypeHookAp :: Newtype (HookAp emittedValue hedgedHooks hooks input slots output m a) _
+derive instance newtypeHookAp :: Newtype (HookAp hedgedHooks hooks emittedValue input slots output m a) _
 
-derive newtype instance functorHookAp :: Functor (HookAp emittedValue hedgedHooks hooks input slots output m)
+derive newtype instance functorHookAp :: Functor (HookAp hedgedHooks hooks emittedValue input slots output m)
 
-derive newtype instance applyHookAp :: Apply (HookAp emittedValue hedgedHooks hooks input slots output m)
+derive newtype instance applyHookAp :: Apply (HookAp hedgedHooks hooks emittedValue input slots output m)
 
-derive newtype instance applicativeHookAp :: Applicative (HookAp emittedValue hedgedHooks hooks input slots output m)
+derive newtype instance applicativeHookAp :: Applicative (HookAp hedgedHooks hooks emittedValue input slots output m)
 
 -- | Raises an output message for the component.
-raise :: forall emittedValue hedgedHooks hooks input slots output m. output -> HookM emittedValue hedgedHooks hooks input slots output m Unit
+raise :: forall hedgedHooks hooks emittedValue input slots output m. output -> HookM hedgedHooks hooks emittedValue input slots output m Unit
 raise o = HookM (H.raise o)
 
 -- | Sends a query to a child of a component at the specified slot.
 query ::
-  forall emittedValue hedgedHooks hooks input output m label slots query output' slot a _1.
+  forall hedgedHooks hooks emittedValue input output m label slots query output' slot a _1.
   Row.Cons label (Slot query output' slot) _1 slots =>
   IsSymbol label =>
   Ord slot =>
   Proxy label ->
   slot ->
   query a ->
-  HookM emittedValue hedgedHooks hooks input slots output m (Maybe a)
+  HookM hedgedHooks hooks emittedValue input slots output m (Maybe a)
 query label p q = HookM (H.query label p q)
 
 -- | Sends a query to all children of a component at a given slot label.
 queryAll ::
-  forall emittedValue hedgedHooks hooks input output m label slots query output' slot a _1.
+  forall hedgedHooks hooks emittedValue input output m label slots query output' slot a _1.
   Row.Cons label (Slot query output' slot) _1 slots =>
   IsSymbol label =>
   Ord slot =>
   Proxy label ->
   query a ->
-  HookM emittedValue hedgedHooks hooks input slots output m (Map slot a)
+  HookM hedgedHooks hooks emittedValue input slots output m (Map slot a)
 queryAll label q = HookM (H.queryAll label q)
 
-subscribe :: forall emittedValue hedgedHooks hooks input slots output m. HS.Emitter emittedValue -> HookM emittedValue hedgedHooks hooks input slots output m H.SubscriptionId
+subscribe :: forall hedgedHooks hooks emittedValue input slots output m. HS.Emitter emittedValue -> HookM hedgedHooks hooks emittedValue input slots output m H.SubscriptionId
 subscribe es = HookM (H.subscribe (map Emit es))
 
 -- | An alternative to `subscribe`, intended for subscriptions that unsubscribe
@@ -185,12 +185,12 @@ subscribe es = HookM (H.subscribe (map Emit es))
 -- | When a component is disposed of any active subscriptions will automatically
 -- | be stopped and no further subscriptions will be possible during
 -- | finalization.
-subscribe' :: forall emittedValue hedgedHooks hooks input slots output m. (H.SubscriptionId -> HS.Emitter emittedValue) -> HookM emittedValue hedgedHooks hooks input slots output m Unit
+subscribe' :: forall hedgedHooks hooks emittedValue input slots output m. (H.SubscriptionId -> HS.Emitter emittedValue) -> HookM hedgedHooks hooks emittedValue input slots output m Unit
 subscribe' esc = HookM (H.subscribe' ((map <<< map) Emit esc))
 
 -- | Unsubscribes a component from a subscription. If the subscription associated
 -- | with the ID has already ended this will have no effect.
-unsubscribe :: forall emittedValue hedgedHooks hooks input slots output m. H.SubscriptionId -> HookM emittedValue hedgedHooks hooks input slots output m Unit
+unsubscribe :: forall hedgedHooks hooks emittedValue input slots output m. H.SubscriptionId -> HookM hedgedHooks hooks emittedValue input slots output m Unit
 unsubscribe sid = HookM (H.unsubscribe sid)
 
 -- | Starts a `HalogenM` process running independent from the current `eval`
@@ -209,33 +209,33 @@ unsubscribe sid = HookM (H.unsubscribe sid)
 -- | When a component is disposed of any active forks will automatically
 -- | be killed. New forks can be started during finalization but there will be
 -- | no means of killing them.
-fork :: forall emittedValue hedgedHooks hooks input slots output m. HookM emittedValue hedgedHooks hooks input slots output m Unit -> HookM emittedValue hedgedHooks hooks input slots output m H.ForkId
+fork :: forall hedgedHooks hooks emittedValue input slots output m. HookM hedgedHooks hooks emittedValue input slots output m Unit -> HookM hedgedHooks hooks emittedValue input slots output m H.ForkId
 fork (HookM hmu) = HookM (H.fork hmu)
 
 -- | Kills a forked process if it is still running. Attempting to kill a forked
 -- | process that has already ended will have no effect.
-kill :: forall emittedValue hedgedHooks hooks input slots output m. H.ForkId -> HookM emittedValue hedgedHooks hooks input slots output m Unit
+kill :: forall hedgedHooks hooks emittedValue input slots output m. H.ForkId -> HookM hedgedHooks hooks emittedValue input slots output m Unit
 kill fid = HookM (H.kill fid)
 
 -- | Retrieves an `Element` value that is associated with a `Ref` in the
 -- | rendered output of a component. If there is no currently rendered value for
 -- | the requested ref this will return `Nothing`.
-getRef :: forall emittedValue hedgedHooks hooks input slots output m. RefLabel -> HookM emittedValue hedgedHooks hooks input slots output m (Maybe Element)
+getRef :: forall hedgedHooks hooks emittedValue input slots output m. RefLabel -> HookM hedgedHooks hooks emittedValue input slots output m (Maybe Element)
 getRef p = HookM (H.getRef p)
 
 mapOutput ::
-  forall emittedValue hedgedHooks hooks input slots output output' m.
+  forall hedgedHooks hooks emittedValue input slots output output' m.
   (output -> output') ->
-  HookM emittedValue hedgedHooks hooks input slots output m
-    ~> HookM emittedValue hedgedHooks hooks input slots output' m
+  HookM hedgedHooks hooks emittedValue input slots output m
+    ~> HookM hedgedHooks hooks emittedValue input slots output' m
 mapOutput f (HookM h) = HookM (unsafeCoerce $ HM.mapOutput f h)
 
 hoist ::
-  forall emittedValue hedgedHooks hooks input slots output m m'.
+  forall hedgedHooks hooks emittedValue input slots output m m'.
   Functor m' =>
   (m ~> m') ->
-  HookM emittedValue hedgedHooks hooks input slots output m
-    ~> HookM emittedValue hedgedHooks hooks input slots output m'
+  HookM hedgedHooks hooks emittedValue input slots output m
+    ~> HookM hedgedHooks hooks emittedValue input slots output m'
 hoist nat (HookM fa) = HookM (unsafeCoerce $ HM.hoist nat fa)
 
 newtype ReadOnly a
@@ -245,62 +245,62 @@ derive instance newtypeReadOnly :: Newtype (ReadOnly a) _
 
 derive instance functorReadOnly :: Functor ReadOnly
 
-newtype IndexedHookM emittedValue hedgedHooks hooks input slots output m (i :: Row Type) (o :: Row Type) a
-  = IndexedHookM (HookM emittedValue hedgedHooks hooks input slots output m a)
+newtype IndexedHookM hedgedHooks hooks emittedValue input slots output m (i :: Row Type) (o :: Row Type) a
+  = IndexedHookM (HookM hedgedHooks hooks emittedValue input slots output m a)
 
-derive instance indexedHookFFunctor :: Functor (IndexedHookM emittedValue hedgedHooks hooks input slots output m i i)
+derive instance indexedHookFFunctor :: Functor (IndexedHookM hedgedHooks hooks emittedValue input slots output m i i)
 
-instance indexedHookFApply :: Apply (IndexedHookM emittedValue hedgedHooks hooks input slots output m i i) where
+instance indexedHookFApply :: Apply (IndexedHookM hedgedHooks hooks emittedValue input slots output m i i) where
   apply = iapply
 
-instance indexedHookFBind :: Bind (IndexedHookM emittedValue hedgedHooks hooks input slots output m i i) where
+instance indexedHookFBind :: Bind (IndexedHookM hedgedHooks hooks emittedValue input slots output m i i) where
   bind = ibind
 
-instance indexedHookFApplicative :: Applicative (IndexedHookM emittedValue hedgedHooks hooks input slots output m i i) where
+instance indexedHookFApplicative :: Applicative (IndexedHookM hedgedHooks hooks emittedValue input slots output m i i) where
   pure = ipure
 
-instance indexedHookFMonad :: Monad (IndexedHookM emittedValue hedgedHooks hooks input slots output m i i)
+instance indexedHookFMonad :: Monad (IndexedHookM hedgedHooks hooks emittedValue input slots output m i i)
 
-instance indexedHookFIxFunctor :: IxFunctor (IndexedHookM emittedValue hedgedHooks hooks input slots output m) where
+instance indexedHookFIxFunctor :: IxFunctor (IndexedHookM hedgedHooks hooks emittedValue input slots output m) where
   imap f (IndexedHookM a) = IndexedHookM (map f a)
 
-instance indexedHookFIxApply :: IxApply (IndexedHookM emittedValue hedgedHooks hooks input slots output m) where
+instance indexedHookFIxApply :: IxApply (IndexedHookM hedgedHooks hooks emittedValue input slots output m) where
   iapply = iap
 
-instance indexedHookFIxApplicative :: IxApplicative (IndexedHookM emittedValue hedgedHooks hooks input slots output m) where
+instance indexedHookFIxApplicative :: IxApplicative (IndexedHookM hedgedHooks hooks emittedValue input slots output m) where
   ipure = IndexedHookM <<< pure
 
-instance indexedHookFIxBind :: IxBind (IndexedHookM emittedValue hedgedHooks hooks input slots output m) where
+instance indexedHookFIxBind :: IxBind (IndexedHookM hedgedHooks hooks emittedValue input slots output m) where
   ibind (IndexedHookM fmonad) function = IndexedHookM (fmonad >>= \f -> let IndexedHookM o = function f in o)
 
-instance indexedHookFIxMonad :: IxMonad (IndexedHookM emittedValue hedgedHooks hooks input slots output m)
+instance indexedHookFIxMonad :: IxMonad (IndexedHookM hedgedHooks hooks emittedValue input slots output m)
 
 lift ::
-  forall emittedValue hedgedHooks hooks input slots output m v i.
-  HookM emittedValue hedgedHooks hooks input slots output m v ->
-  IndexedHookM emittedValue hedgedHooks hooks input slots output m i i v
+  forall hedgedHooks hooks emittedValue input slots output m v i.
+  HookM hedgedHooks hooks emittedValue input slots output m v ->
+  IndexedHookM hedgedHooks hooks emittedValue input slots output m i i v
 lift = IndexedHookM
 
 hook ::
-  forall hedgedHooks' emittedValue hedgedHooks hooks input slots output m proxy sym v i o.
+  forall hedgedHooks' hedgedHooks hooks emittedValue input slots output m proxy sym v i o.
   IsSymbol sym =>
   Lacks sym i =>
   Cons sym v i o =>
   Cons sym (Maybe (First (v))) hedgedHooks' hedgedHooks =>
   proxy sym ->
   v ->
-  IndexedHookM emittedValue hedgedHooks hooks input slots output m i o v
+  IndexedHookM hedgedHooks hooks emittedValue input slots output m i o v
 hook px = hookM px <<< pure
 
 hookM ::
-  forall hedgedHooks' emittedValue hedgedHooks hooks input slots output proxy sym m v i o.
+  forall hedgedHooks' hedgedHooks hooks emittedValue input slots output proxy sym m v i o.
   IsSymbol sym =>
   Lacks sym i =>
   Cons sym v i o =>
   Cons sym (Maybe (First (v))) hedgedHooks' hedgedHooks =>
   proxy sym ->
-  HookM emittedValue hedgedHooks hooks input slots output m v ->
-  IndexedHookM emittedValue hedgedHooks hooks input slots output m i o v
+  HookM hedgedHooks hooks emittedValue input slots output m v ->
+  IndexedHookM hedgedHooks hooks emittedValue input slots output m i o v
 hookM px m =
   IndexedHookM do
     { hooks } <- HookM H.get
@@ -311,8 +311,8 @@ hookM px m =
                 IndexedHookM ihf =
                   ( hookM ::
                       proxy sym ->
-                      HookM emittedValue hedgedHooks hooks input slots output m v ->
-                      IndexedHookM emittedValue hedgedHooks hooks input slots output m i o v
+                      HookM hedgedHooks hooks emittedValue input slots output m v ->
+                      IndexedHookM hedgedHooks hooks emittedValue input slots output m i o v
                   )
                     px
                     m
@@ -321,12 +321,12 @@ hookM px m =
             )
       Just (First v) -> pure v
 
-data Action emittedValue hedgedHooks hooks input slots output m
+data Action hedgedHooks hooks emittedValue input slots output m
   = Initialize
   | Emit emittedValue
   | Modify
-    ( HookM emittedValue hedgedHooks hooks input slots output m { | hooks } ->
-      HookM emittedValue hedgedHooks hooks input slots output m (Variant hedgedHooks)
+    ( HookM hedgedHooks hooks emittedValue input slots output m { | hooks } ->
+      HookM hedgedHooks hooks emittedValue input slots output m (Variant hedgedHooks)
     )
   | Receive input
   | Finalize
@@ -359,9 +359,9 @@ instance unsafeUnhedgeHoodsAll :: (RowToList hedgedHooks hedgedHooksRL, RowToLis
   unsafeUnhedgeHoods = unsafeUnhedgeHoodsRL (Proxy :: _ hedgedHooksRL) (Proxy :: _ hooksRL)
 
 unsafeHooks ::
-  forall emittedValue hedgedHooks hooks input slots output m.
+  forall hedgedHooks hooks emittedValue input slots output m.
   HedgeHooks hedgedHooks hooks =>
-  HookM emittedValue hedgedHooks hooks input slots output m { | hooks }
+  HookM hedgedHooks hooks emittedValue input slots output m { | hooks }
 unsafeHooks =
   HookM do
     { hooks } <- H.get
@@ -374,7 +374,7 @@ setHook ::
   IsSymbol sym =>
   proxy sym ->
   a ->
-  HookM emittedValue hedgedHooks hooks input slots output m Unit
+  HookM hedgedHooks hooks emittedValue input slots output m Unit
 setHook px a =
   HookM
     ( H.modify_ \i ->
@@ -382,8 +382,8 @@ setHook px a =
     )
 
 getHooks ::
-  forall emittedValue hedgedHooks hooks input slots output m.
-  HookM emittedValue hedgedHooks hooks input slots output m { | hedgedHooks }
+  forall hedgedHooks hooks emittedValue input slots output m.
+  HookM hedgedHooks hooks emittedValue input slots output m { | hedgedHooks }
 getHooks = HookM (H.gets _.hooks)
 
 class NotReadOnly (a :: Type)
@@ -398,7 +398,7 @@ set ::
   IsSymbol sym =>
   proxy sym ->
   a ->
-  Action emittedValue hedgedHooks hooks input slots output m
+  Action hedgedHooks hooks emittedValue input slots output m
 set px a = setM px (pure a)
 
 setM ::
@@ -407,8 +407,8 @@ setM ::
   Cons sym (Maybe (First a)) r1 hedgedHooks =>
   IsSymbol sym =>
   proxy sym ->
-  HookM emittedValue hedgedHooks hooks input slots output m a ->
-  Action emittedValue hedgedHooks hooks input slots output m
+  HookM hedgedHooks hooks emittedValue input slots output m a ->
+  Action hedgedHooks hooks emittedValue input slots output m
 setM px v = setMWithHooks px (pure v)
 
 setMWithHooks ::
@@ -417,10 +417,10 @@ setMWithHooks ::
   Cons sym (Maybe (First a)) r1 hedgedHooks =>
   IsSymbol sym =>
   proxy sym ->
-  ( HookM emittedValue hedgedHooks hooks input slots output m { | hooks } ->
-    HookM emittedValue hedgedHooks hooks input slots output m a
+  ( HookM hedgedHooks hooks emittedValue input slots output m { | hooks } ->
+    HookM hedgedHooks hooks emittedValue input slots output m a
   ) ->
-  Action emittedValue hedgedHooks hooks input slots output m
+  Action hedgedHooks hooks emittedValue input slots output m
 setMWithHooks px v = Modify ((map <<< map) (inj px <<< Just <<< First) v)
 
 modify ::
@@ -431,31 +431,31 @@ modify ::
   IsSymbol sym =>
   proxy sym ->
   (a -> a) ->
-  Action emittedValue hedgedHooks hooks input slots output m
+  Action hedgedHooks hooks emittedValue input slots output m
 modify px f = setMWithHooks px (map f <<< map (Record.get (Proxy :: _ sym)))
 
-type HookHTML emittedValue hedgedHooks hooks input slots output m
-  = HC.HTML (H.ComponentSlot slots m (Action emittedValue hedgedHooks hooks input slots output m)) (Action emittedValue hedgedHooks hooks input slots output m)
+type HookHTML hedgedHooks hooks emittedValue input slots output m
+  = HC.HTML (H.ComponentSlot slots m (Action hedgedHooks hooks emittedValue input slots output m)) (Action hedgedHooks hooks emittedValue input slots output m)
 
-type HookArg emittedValue hedgedHooks hooks input slots output m
+type HookArg hedgedHooks hooks emittedValue input slots output m
   = input ->
-    IndexedHookM emittedValue hedgedHooks hooks input slots output m () hooks (HookHTML emittedValue hedgedHooks hooks input slots output m)
+    IndexedHookM hedgedHooks hooks emittedValue input slots output m () hooks (HookHTML hedgedHooks hooks emittedValue input slots output m)
 
 handleAction ::
   forall hedgedHooks hooks emittedValue input slots output m rest.
-  { finalize :: HookM emittedValue hedgedHooks hooks input slots output m Unit
-  , handleEmittedValue :: emittedValue -> HookM emittedValue hedgedHooks hooks input slots output m Unit
+  { finalize :: HookM hedgedHooks hooks emittedValue input slots output m Unit
+  , handleEmittedValue :: emittedValue -> HookM hedgedHooks hooks emittedValue input slots output m Unit
   | rest
   } ->
   HedgeHooks hedgedHooks hooks =>
-  HookArg emittedValue hedgedHooks hooks input slots output m ->
-  Action emittedValue hedgedHooks hooks input slots output m ->
+  HookArg hedgedHooks hooks emittedValue input slots output m ->
+  Action hedgedHooks hooks emittedValue input slots output m ->
   H.HalogenM
     { hooks :: { | hedgedHooks }
     , input :: input
-    , html :: HookHTML emittedValue hedgedHooks hooks input slots output m
+    , html :: HookHTML hedgedHooks hooks emittedValue input slots output m
     }
-    (Action emittedValue hedgedHooks hooks input slots output m)
+    (Action hedgedHooks hooks emittedValue input slots output m)
     slots
     output
     m
@@ -479,17 +479,17 @@ handleAction { handleEmittedValue, finalize } f = case _ of
   Finalize -> let HookM done = finalize in done
   Emit emittedValue -> let HookM handled = handleEmittedValue emittedValue in handled
 
-type Options query emittedValue hedgedHooks hooks input slots output m
+type Options query hedgedHooks hooks emittedValue input slots output m
   = { receiveInput :: Boolean
-    , handleQuery :: forall a. query a -> HookM emittedValue hedgedHooks hooks input slots output m (Maybe a)
-    , handleEmittedValue :: emittedValue -> HookM emittedValue hedgedHooks hooks input slots output m Unit
-    , finalize :: HookM emittedValue hedgedHooks hooks input slots output m Unit
-    , initialHTML :: HookHTML emittedValue hedgedHooks hooks input slots output m
+    , handleQuery :: forall a. query a -> HookM hedgedHooks hooks emittedValue input slots output m (Maybe a)
+    , handleEmittedValue :: emittedValue -> HookM hedgedHooks hooks emittedValue input slots output m Unit
+    , finalize :: HookM hedgedHooks hooks emittedValue input slots output m Unit
+    , initialHTML :: HookHTML hedgedHooks hooks emittedValue input slots output m
     }
 
 defaultOptions ::
-  forall query emittedValue hedgedHooks hooks input slots output m.
-  Options query emittedValue hedgedHooks hooks input slots output m
+  forall query hedgedHooks hooks emittedValue input slots output m.
+  Options query hedgedHooks hooks emittedValue input slots output m
 defaultOptions =
   { receiveInput: false
   , handleQuery: \_ -> pure Nothing
@@ -502,8 +502,8 @@ component ::
   forall emittedValue slots hedgedHooks hooks query input output m.
   HedgeHooks hedgedHooks hooks =>
   Monoid { | hedgedHooks } =>
-  Options query emittedValue hedgedHooks hooks input slots output m ->
-  HookArg emittedValue hedgedHooks hooks input slots output m ->
+  Options query hedgedHooks hooks emittedValue input slots output m ->
+  HookArg hedgedHooks hooks emittedValue input slots output m ->
   H.Component query input output m
 component options f =
   H.mkComponent
