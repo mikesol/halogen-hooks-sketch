@@ -16,6 +16,7 @@ module App.Hooks
   , hoist
   , component
   , getHooks
+  , lift
   , Action
   , HookM
   , set
@@ -51,7 +52,6 @@ import Data.Tuple.Nested (type (/\), (/\))
 import Data.Variant (Variant, inj)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect)
-import Halogen (lift)
 import Halogen as H
 import Halogen.Data.Slot (Slot)
 import Halogen.HTML as HH
@@ -107,7 +107,7 @@ instance parallelHookM :: Parallel (HookAp emittedValue o input slots output m) 
   sequential (HookAp a) = HookM (sequential a)
 
 instance monadTransHookM :: MonadTrans (HookM emittedValue o input slots output) where
-  lift = HookM <<< lift
+  lift = HookM <<< H.lift
 
 derive newtype instance monadRecHookM :: MonadRec (HookM emittedValue o input slots output m)
 
@@ -291,10 +291,10 @@ instance indexedHookFMonad :: Monad (IndexedHookF emittedValue input slots outpu
 instance indexedHookFIxFunctor :: IxFunctor (IndexedHookF emittedValue input slots output m) where
   imap f (IndexedHookF a) = IndexedHookF ((map <<< map <<< map) f a)
 
-instance indexedHookFIxApplicative :: IxApply (IndexedHookF emittedValue input slots output m) where
+instance indexedHookFIxApply :: IxApply (IndexedHookF emittedValue input slots output m) where
   iapply = iap
 
-instance indexedHookFIxApply :: IxApplicative (IndexedHookF emittedValue input slots output m) where
+instance indexedHookFIxApplicative :: IxApplicative (IndexedHookF emittedValue input slots output m) where
   ipure a =
     IndexedHookF \i ->
       pure
@@ -324,6 +324,23 @@ instance indexedHookFIxBind :: IxBind (IndexedHookF emittedValue input slots out
                 )
 
 instance indexedHookFIxMonad :: IxMonad (IndexedHookF emittedValue input slots output m)
+
+
+lift ::
+  forall emittedValue input slots output m v i o.
+  HookM emittedValue o input slots output m v ->
+  IndexedHookF emittedValue input slots output m i i v
+lift v = let HookM m = unsafeCoerce v :: HookM emittedValue i input slots output m v in
+  IndexedHookF
+    ( \io -> do
+        m' <- m
+        pure
+          $ ( case io of
+                Left i -> i
+                Right o -> o
+            )
+          /\ m'
+    )
 
 hook ::
   forall emittedValue input slots output m proxy sym v i o.
