@@ -1,5 +1,5 @@
 module App.Hooks
-  ( IndexedHookF
+  ( IndexedHookM
   , hook
   , hookM
   , raise
@@ -245,41 +245,41 @@ derive instance newtypeReadOnly :: Newtype (ReadOnly a) _
 
 derive instance functorReadOnly :: Functor ReadOnly
 
-newtype IndexedHookF emittedValue hedgedHooks hooks input slots output m (i :: Row Type) (o :: Row Type) a
-  = IndexedHookF (HookM emittedValue hedgedHooks hooks input slots output m a)
+newtype IndexedHookM emittedValue hedgedHooks hooks input slots output m (i :: Row Type) (o :: Row Type) a
+  = IndexedHookM (HookM emittedValue hedgedHooks hooks input slots output m a)
 
-derive instance indexedHookFFunctor :: Functor (IndexedHookF emittedValue hedgedHooks hooks input slots output m i i)
+derive instance indexedHookFFunctor :: Functor (IndexedHookM emittedValue hedgedHooks hooks input slots output m i i)
 
-instance indexedHookFApply :: Apply (IndexedHookF emittedValue hedgedHooks hooks input slots output m i i) where
+instance indexedHookFApply :: Apply (IndexedHookM emittedValue hedgedHooks hooks input slots output m i i) where
   apply = iapply
 
-instance indexedHookFBind :: Bind (IndexedHookF emittedValue hedgedHooks hooks input slots output m i i) where
+instance indexedHookFBind :: Bind (IndexedHookM emittedValue hedgedHooks hooks input slots output m i i) where
   bind = ibind
 
-instance indexedHookFApplicative :: Applicative (IndexedHookF emittedValue hedgedHooks hooks input slots output m i i) where
+instance indexedHookFApplicative :: Applicative (IndexedHookM emittedValue hedgedHooks hooks input slots output m i i) where
   pure = ipure
 
-instance indexedHookFMonad :: Monad (IndexedHookF emittedValue hedgedHooks hooks input slots output m i i)
+instance indexedHookFMonad :: Monad (IndexedHookM emittedValue hedgedHooks hooks input slots output m i i)
 
-instance indexedHookFIxFunctor :: IxFunctor (IndexedHookF emittedValue hedgedHooks hooks input slots output m) where
-  imap f (IndexedHookF a) = IndexedHookF (map f a)
+instance indexedHookFIxFunctor :: IxFunctor (IndexedHookM emittedValue hedgedHooks hooks input slots output m) where
+  imap f (IndexedHookM a) = IndexedHookM (map f a)
 
-instance indexedHookFIxApply :: IxApply (IndexedHookF emittedValue hedgedHooks hooks input slots output m) where
+instance indexedHookFIxApply :: IxApply (IndexedHookM emittedValue hedgedHooks hooks input slots output m) where
   iapply = iap
 
-instance indexedHookFIxApplicative :: IxApplicative (IndexedHookF emittedValue hedgedHooks hooks input slots output m) where
-  ipure = IndexedHookF <<< pure
+instance indexedHookFIxApplicative :: IxApplicative (IndexedHookM emittedValue hedgedHooks hooks input slots output m) where
+  ipure = IndexedHookM <<< pure
 
-instance indexedHookFIxBind :: IxBind (IndexedHookF emittedValue hedgedHooks hooks input slots output m) where
-  ibind (IndexedHookF fmonad) function = IndexedHookF (fmonad >>= \f -> let IndexedHookF o = function f in o)
+instance indexedHookFIxBind :: IxBind (IndexedHookM emittedValue hedgedHooks hooks input slots output m) where
+  ibind (IndexedHookM fmonad) function = IndexedHookM (fmonad >>= \f -> let IndexedHookM o = function f in o)
 
-instance indexedHookFIxMonad :: IxMonad (IndexedHookF emittedValue hedgedHooks hooks input slots output m)
+instance indexedHookFIxMonad :: IxMonad (IndexedHookM emittedValue hedgedHooks hooks input slots output m)
 
 lift ::
   forall emittedValue hedgedHooks hooks input slots output m v i.
   HookM emittedValue hedgedHooks hooks input slots output m v ->
-  IndexedHookF emittedValue hedgedHooks hooks input slots output m i i v
-lift = IndexedHookF
+  IndexedHookM emittedValue hedgedHooks hooks input slots output m i i v
+lift = IndexedHookM
 
 hook ::
   forall hedgedHooks' emittedValue hedgedHooks hooks input slots output m proxy sym v i o.
@@ -289,7 +289,7 @@ hook ::
   Cons sym (Maybe (First (v))) hedgedHooks' hedgedHooks =>
   proxy sym ->
   v ->
-  IndexedHookF emittedValue hedgedHooks hooks input slots output m i o v
+  IndexedHookM emittedValue hedgedHooks hooks input slots output m i o v
 hook px = hookM px <<< pure
 
 hookM ::
@@ -300,19 +300,19 @@ hookM ::
   Cons sym (Maybe (First (v))) hedgedHooks' hedgedHooks =>
   proxy sym ->
   HookM emittedValue hedgedHooks hooks input slots output m v ->
-  IndexedHookF emittedValue hedgedHooks hooks input slots output m i o v
+  IndexedHookM emittedValue hedgedHooks hooks input slots output m i o v
 hookM px m =
-  IndexedHookF do
+  IndexedHookM do
     { hooks } <- HookM H.get
     case Record.get px hooks of
       Nothing ->
         (m >>= setHook px)
           *> ( let
-                IndexedHookF ihf =
+                IndexedHookM ihf =
                   ( hookM ::
                       proxy sym ->
                       HookM emittedValue hedgedHooks hooks input slots output m v ->
-                      IndexedHookF emittedValue hedgedHooks hooks input slots output m i o v
+                      IndexedHookM emittedValue hedgedHooks hooks input slots output m i o v
                   )
                     px
                     m
@@ -439,7 +439,7 @@ type HookHTML emittedValue hedgedHooks hooks input slots output m
 
 type HookArg emittedValue hedgedHooks hooks input slots output m
   = input ->
-    IndexedHookF emittedValue hedgedHooks hooks input slots output m () hooks (HookHTML emittedValue hedgedHooks hooks input slots output m)
+    IndexedHookM emittedValue hedgedHooks hooks input slots output m () hooks (HookHTML emittedValue hedgedHooks hooks input slots output m)
 
 handleAction ::
   forall hedgedHooks hooks emittedValue input slots output m rest.
@@ -463,18 +463,18 @@ handleAction ::
 handleAction { handleEmittedValue, finalize } f = case _ of
   Initialize -> do
     { input } <- H.get
-    html <- let IndexedHookF (HookM m) = f input in m
+    html <- let IndexedHookM (HookM m) = f input in m
     H.modify_ _ { html = html }
   Modify v' -> do
     v <- let HookM v'' = v' unsafeHooks in v''
     H.modify_ \i -> i { hooks = setViaVariant v i.hooks }
     { input } <- H.get
-    html <- let IndexedHookF (HookM m) = f input in m
+    html <- let IndexedHookM (HookM m) = f input in m
     H.modify_ _ { html = html }
   Receive i -> do
     H.modify_ _ { input = i }
     { input } <- H.get
-    html <- let IndexedHookF (HookM m) = f input in m
+    html <- let IndexedHookM (HookM m) = f input in m
     H.modify_ _ { html = html }
   Finalize -> let HookM done = finalize in done
   Emit emittedValue -> let HookM handled = handleEmittedValue emittedValue in handled
