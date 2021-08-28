@@ -338,7 +338,7 @@ hookM ::
   IndexedHookM hooks emittedValue input slots output m i o v
 hookM px m =
   IndexedHookM do
-    { hooks } <- HookM H.get
+    hooks <- getHooks
     case unhedgeAt px hooks of
       Nothing ->
         (m >>= setHook px)
