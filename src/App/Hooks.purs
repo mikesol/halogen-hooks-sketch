@@ -2,20 +2,24 @@ module App.Hooks
   ( IndexedHookM
   , hook
   , component
-  , getHooks
+  , getHooksM
   , lift
   , HookAction
   , HookM
+  , HookArg
   , doThis
-  , hedge
-  , setHook
-  , unhedgeAt
-  , setHedgedAt
-  , Hedged
+  , asHooks
+  , setHookMCons
+  , setHookMUnion
+  , getHookCons
+  , setHookCons
+  , setHookUnion
+  , Hooks
   , defaultOptions
   , Options
   , ReadOnly(..)
   , class NotReadOnly
+  , class NotReadOnlyRL
   , HookHTML
   ) where
 
@@ -31,13 +35,14 @@ import Data.Symbol (class IsSymbol, reflectSymbol)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Core as HC
-import Prim.Row (class Cons, class Lacks)
+import Prim.Row (class Cons, class Lacks, class Union)
+import Prim.RowList as RL
 import Prim.TypeError (class Fail, Text)
 import Unsafe.Coerce (unsafeCoerce)
 
 type HookM hooks input slots output m a
   = H.HalogenM
-      { hooks :: (Hedged hooks)
+      { hooks :: (Hooks hooks)
       , input :: input
       , html :: HookHTML hooks input slots output m
       }
@@ -54,66 +59,44 @@ derive instance newtypeReadOnly :: Newtype (ReadOnly a) _
 
 derive instance functorReadOnly :: Functor ReadOnly
 
-newtype IndexedHookM hooks input slots output m (i :: Row Type) (o :: Row Type) a
-  = IndexedHookM (HookM hooks input slots output m a)
+data Hooks (r :: Row Type)
 
-derive instance indexedHookFFunctor :: Functor (IndexedHookM hooks input slots output m i i)
+foreign import getHookConsFFI :: forall a r. Maybe a -> (a -> Maybe a) -> String -> Hooks r -> Maybe a
 
-instance indexedHookFApply :: Apply (IndexedHookM hooks input slots output m i i) where
-  apply = iapply
-
-instance indexedHookFBind :: Bind (IndexedHookM hooks input slots output m i i) where
-  bind = ibind
-
-instance indexedHookFApplicative :: Applicative (IndexedHookM hooks input slots output m i i) where
-  pure = ipure
-
-instance indexedHookFMonad :: Monad (IndexedHookM hooks input slots output m i i)
-
-instance indexedHookFIxFunctor :: IxFunctor (IndexedHookM hooks input slots output m) where
-  imap f (IndexedHookM a) = IndexedHookM (map f a)
-
-instance indexedHookFIxApply :: IxApply (IndexedHookM hooks input slots output m) where
-  iapply = iap
-
-instance indexedHookFIxApplicative :: IxApplicative (IndexedHookM hooks input slots output m) where
-  ipure = IndexedHookM <<< pure
-
-instance indexedHookFIxBind :: IxBind (IndexedHookM hooks input slots output m) where
-  ibind (IndexedHookM fmonad) function = IndexedHookM (fmonad >>= \f -> let IndexedHookM o = function f in o)
-
-instance indexedHookFIxMonad :: IxMonad (IndexedHookM hooks input slots output m)
-
-lift ::
-  forall hooks input slots output m v i.
-  HookM hooks input slots output m v ->
-  IndexedHookM hooks input slots output m i i v
-lift = IndexedHookM
-
-hook ::
-  forall hooks' hooks input slots output proxy sym m v i o.
+getHookCons ::
+  forall proxy sym a r1 hooks.
   IsSymbol sym =>
-  Lacks sym i =>
-  Cons sym v i o =>
-  Cons sym v hooks' hooks =>
+  Cons sym a r1 hooks =>
   proxy sym ->
-  HookM hooks input slots output m v ->
-  IndexedHookM hooks input slots output m i o v
-hook px m = IndexedHookM go
-  where
-  go =
-    unhedgeAt px <$> getHooks
-      >>= case _ of
-          Nothing -> (m >>= setHook px) *> go
-          Just v -> pure v
+  Hooks hooks ->
+  Maybe a
+getHookCons = getHookConsFFI Nothing Just <<< reflectSymbol
 
-data HookAction hooks input slots output m
-  = Initialize
-  | DoThis (HookM hooks input slots output m Unit)
-  | Receive input
-  | Finalize
+foreign import setHookConsFFI :: forall a r. String -> a -> Hooks r -> Hooks r
 
-setHook ::
+setHookCons ::
+  forall proxy sym a r1 hooks.
+  IsSymbol sym =>
+  Cons sym a r1 hooks =>
+  proxy sym ->
+  a ->
+  Hooks hooks ->
+  Hooks hooks
+setHookCons = setHookConsFFI <<< reflectSymbol
+
+data SetHookUnion
+
+foreign import setHookUnionFFI :: forall r. SetHookUnion -> Hooks r -> Hooks r
+
+setHookUnion ::
+  forall r1 r2 hooks.
+  Union r1 r2 hooks =>
+  { | r1 } ->
+  Hooks hooks ->
+  Hooks hooks
+setHookUnion = setHookUnionFFI <<< unsafeCoerce
+
+setHookMCons ::
   forall proxy output input slots m sym a r1 hooks.
   NotReadOnly a =>
   Cons sym a r1 hooks =>
@@ -121,43 +104,36 @@ setHook ::
   proxy sym ->
   a ->
   HookM hooks input slots output m Unit
-setHook px a =
+setHookMCons px a =
   ( H.modify_ \i ->
-      i { hooks = setHedgedAt px a i.hooks }
+      i { hooks = setHookCons px a i.hooks }
   )
 
-data Hedged (r :: Row Type)
+class NotReadOnlyRL (rl :: RL.RowList Type)
 
-foreign import unhedgeAtFFI :: forall a r. Maybe a -> (a -> Maybe a) -> String -> Hedged r -> Maybe a
+instance notReadOnlyRLNil :: NotReadOnlyRL RL.Nil
 
-unhedgeAt ::
-  forall proxy sym a r1 hooks.
-  IsSymbol sym =>
-  Cons sym a r1 hooks =>
-  proxy sym ->
-  Hedged hooks ->
-  Maybe a
-unhedgeAt = unhedgeAtFFI Nothing Just <<< reflectSymbol
+instance notReadOnlyRLCons :: (NotReadOnly b, NotReadOnlyRL c) => NotReadOnlyRL (RL.Cons a b c)
 
-foreign import setHedgedAtFFI :: forall a r. String -> a -> Hedged r -> Hedged r
+setHookMUnion ::
+  forall output input slots m r1 rl r2 hooks.
+  RL.RowToList r1 rl =>
+  NotReadOnlyRL rl =>
+  Union r1 r2 hooks =>
+  { | r1 } ->
+  HookM hooks input slots output m Unit
+setHookMUnion r =
+  ( H.modify_ \i ->
+      i { hooks = setHookUnion r i.hooks }
+  )
 
-setHedgedAt ::
-  forall proxy sym a r1 hooks.
-  IsSymbol sym =>
-  Cons sym a r1 hooks =>
-  proxy sym ->
-  a ->
-  Hedged hooks ->
-  Hedged hooks
-setHedgedAt = setHedgedAtFFI <<< reflectSymbol
+asHooks :: forall r. { | r } -> Hooks r
+asHooks = unsafeCoerce
 
-hedge :: forall r. { | r } -> Hedged r
-hedge = unsafeCoerce
-
-getHooks ::
+getHooksM ::
   forall hooks input slots output m.
-  HookM hooks input slots output m (Hedged hooks)
-getHooks = H.gets _.hooks
+  HookM hooks input slots output m (Hooks hooks)
+getHooksM = H.gets _.hooks
 
 class NotReadOnly (a :: Type)
 
@@ -185,7 +161,7 @@ handleHookAction ::
   HookArg hooks input slots output m ->
   HookAction hooks input slots output m ->
   H.HalogenM
-    { hooks :: (Hedged hooks)
+    { hooks :: (Hooks hooks)
     , input :: input
     , html :: HookHTML hooks input slots output m
     }
@@ -246,3 +222,62 @@ component options f =
               \q -> let res = options.handleQuery q in res
           }
     }
+
+newtype IndexedHookM hooks input slots output m (i :: Row Type) (o :: Row Type) a
+  = IndexedHookM (HookM hooks input slots output m a)
+
+derive instance indexedHookFFunctor :: Functor (IndexedHookM hooks input slots output m i i)
+
+instance indexedHookFApply :: Apply (IndexedHookM hooks input slots output m i i) where
+  apply = iapply
+
+instance indexedHookFBind :: Bind (IndexedHookM hooks input slots output m i i) where
+  bind = ibind
+
+instance indexedHookFApplicative :: Applicative (IndexedHookM hooks input slots output m i i) where
+  pure = ipure
+
+instance indexedHookFMonad :: Monad (IndexedHookM hooks input slots output m i i)
+
+instance indexedHookFIxFunctor :: IxFunctor (IndexedHookM hooks input slots output m) where
+  imap f (IndexedHookM a) = IndexedHookM (map f a)
+
+instance indexedHookFIxApply :: IxApply (IndexedHookM hooks input slots output m) where
+  iapply = iap
+
+instance indexedHookFIxApplicative :: IxApplicative (IndexedHookM hooks input slots output m) where
+  ipure = IndexedHookM <<< pure
+
+instance indexedHookFIxBind :: IxBind (IndexedHookM hooks input slots output m) where
+  ibind (IndexedHookM fmonad) function = IndexedHookM (fmonad >>= \f -> let IndexedHookM o = function f in o)
+
+instance indexedHookFIxMonad :: IxMonad (IndexedHookM hooks input slots output m)
+
+data HookAction hooks input slots output m
+  = Initialize
+  | DoThis (HookM hooks input slots output m Unit)
+  | Receive input
+  | Finalize
+
+lift ::
+  forall hooks input slots output m v i.
+  HookM hooks input slots output m v ->
+  IndexedHookM hooks input slots output m i i v
+lift = IndexedHookM
+
+hook ::
+  forall hooks' hooks input slots output proxy sym m v i o.
+  IsSymbol sym =>
+  Lacks sym i =>
+  Cons sym v i o =>
+  Cons sym v hooks' hooks =>
+  proxy sym ->
+  HookM hooks input slots output m v ->
+  IndexedHookM hooks input slots output m i o v
+hook px m = IndexedHookM go
+  where
+  go =
+    getHookCons px <$> getHooksM
+      >>= case _ of
+          Nothing -> (m >>= setHookMCons px) *> go
+          Just v -> pure v

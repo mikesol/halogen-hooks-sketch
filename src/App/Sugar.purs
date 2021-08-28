@@ -2,7 +2,7 @@ module App.Sugar where
 
 import Prelude
 
-import App.Hooks (class NotReadOnly, HookAction, HookM, IndexedHookM, doThis, hook, lift, setHook)
+import App.Hooks (class NotReadOnly, HookAction, HookM, IndexedHookM, doThis, hook, lift, setHookMCons)
 import Control.Applicative.Indexed (iwhen)
 import Control.Monad.Indexed.Qualified as Ix
 import Data.Symbol (class IsSymbol)
@@ -10,7 +10,6 @@ import Prim.Row as Row
 import Prim.RowList as RL
 import Prim.Symbol as Symbol
 import Type.Proxy (Proxy(..))
-
 
 class GetLexicalLast (default :: Symbol) (i :: RL.RowList Type) (s :: Symbol) | default i -> s
 
@@ -33,7 +32,7 @@ capture ::
   IndexedHookM hooks input slots output m i o Unit
 capture v m = Ix.do
   prev <- hook px (pure v)
-  iwhen (prev /= v) (lift (setHook px v *> m))
+  iwhen (prev /= v) (lift (setHookMCons px v *> m))
   where
   px = Proxy :: _ sym
 
@@ -56,7 +55,7 @@ setM ::
   proxy sym ->
   HookM hooks input slots output m a ->
   HookAction hooks input slots output m
-setM px v = doThis (v >>= (void <<< setHook px))
+setM px v = doThis (v >>= (void <<< setHookMCons px))
 
 set ::
   forall proxy output input slots m sym a r1 hooks.

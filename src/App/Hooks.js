@@ -1,17 +1,25 @@
-exports.unhedgeAtFFI = function(nothing) {
+exports.getHookConsFFI = function(nothing) {
   return function(just) {
     return function(key) {
-      return function(hedged) {
-        return hedged.hasOwnProperty(key) ? just(hedged[key]) : nothing;
+      return function(hooks) {
+        return hooks.hasOwnProperty(key) ? just(hooks[key]) : nothing;
       }
     }
   }
 }
 
-exports.setHedgedAtFFI = function(key) {
+
+exports.setHookUnionFFI = function(toSet) {
+    return function(hooks) {
+      var o = Object.assign(Object.assign({}, hooks), toSet);
+      return o;
+  }
+}
+
+exports.setHookConsFFI = function(key) {
   return function(val) {
-    return function(hedged) {
-      var o = Object.assign({}, hedged);
+    return function(hooks) {
+      var o = Object.assign({}, hooks);
       o[key] = val;
       return o;
     }
