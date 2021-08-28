@@ -36,7 +36,6 @@ module App.Hooks
   ) where
 
 import Prelude
-
 import Control.Applicative.Indexed (class IxApplicative, iapply, ipure, iwhen)
 import Control.Apply.Indexed (class IxApply)
 import Control.Bind.Indexed (class IxBind, ibind)
@@ -336,24 +335,12 @@ hookM ::
   proxy sym ->
   HookM hooks emittedValue input slots output m v ->
   IndexedHookM hooks emittedValue input slots output m i o v
-hookM px m =
-  IndexedHookM do
+hookM px m = IndexedHookM go
+  where
+  go = do
     hooks <- getHooks
     case unhedgeAt px hooks of
-      Nothing ->
-        (m >>= setHook px)
-          *> ( let
-                IndexedHookM ihf =
-                  ( hookM ::
-                      proxy sym ->
-                      HookM hooks emittedValue input slots output m v ->
-                      IndexedHookM hooks emittedValue input slots output m i o v
-                  )
-                    px
-                    m
-              in
-                ihf
-            )
+      Nothing -> (m >>= setHook px) *> go
       Just v -> pure v
 
 data Action hooks emittedValue input slots output m
