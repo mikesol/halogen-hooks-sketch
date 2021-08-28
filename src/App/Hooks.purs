@@ -336,10 +336,10 @@ hookM ::
   proxy sym ->
   HookM hooks emittedValue input slots output m v ->
   IndexedHookM hooks emittedValue input slots output m i o v
-hookM px m = IndexedHookM go
+hookM px m = IndexedHookM (go unit)
   where
-  go = unhedgeAt px <$> getHooks
-      >>= (\v -> maybe ((m >>= setHook px) *> go) pure v)
+  go _ = unhedgeAt px <$> getHooks
+      >>= (maybe ((m >>= setHook px) *> go unit) pure)
 
 data Action hooks emittedValue input slots output m
   = Initialize
