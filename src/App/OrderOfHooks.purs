@@ -1,7 +1,9 @@
 module App.OrderOfHooks where
 
 import Prelude
+
 import App.Hooks as Hooks
+import App.Sugar as Sugar
 import Control.Applicative.Indexed (ipure)
 import Control.Monad.Indexed.Qualified as Ix
 import Effect.Aff (Aff)
@@ -26,28 +28,28 @@ affAdd1 = pure <<< add 1
 component :: forall q i o. H.Component q i o Aff
 component =
   Hooks.component Hooks.defaultOptions \_ -> Ix.do
-    foo <- Hooks.hook (Proxy :: _ "foo") 0
+    foo <- Sugar.useState (Proxy :: _ "foo") 0
     { bar, baz } <-
       if foo `mod` 2 == 0 then Ix.ado
-        bar <- Hooks.hook (Proxy :: _ "bar") 0
-        baz <- Hooks.hook (Proxy :: _ "baz") 0
+        bar <- Sugar.useState (Proxy :: _ "bar") 0
+        baz <- Sugar.useState (Proxy :: _ "baz") 0
         in { bar, baz }
       else Ix.ado
-        baz <- Hooks.hook (Proxy :: _ "baz") 0
-        bar <- Hooks.hook (Proxy :: _ "bar") 0
+        baz <- Sugar.useState (Proxy :: _ "baz") 0
+        bar <- Sugar.useState (Proxy :: _ "bar") 0
         in { bar, baz }
     ipure
       ( HH.div_
           [ HH.p_
               [ HH.text $ "Foo: " <> show foo <> " Bar: " <> show bar <> " Baz: " <> show baz ]
           , HH.button
-              [ HE.onClick \_ -> Hooks.setM (Proxy :: _ "foo") (lift $ affAdd1 foo) ]
+              [ HE.onClick \_ -> Sugar.setM (Proxy :: _ "foo") (lift $ affAdd1 foo) ]
               [ HH.text "Incr foo" ]
           , HH.button
-              [ HE.onClick \_ -> Hooks.set (Proxy :: _ "bar") (bar + 1) ]
+              [ HE.onClick \_ -> Sugar.set (Proxy :: _ "bar") (bar + 1) ]
               [ HH.text "Incr bar" ]
           , HH.button
-              [ HE.onClick \_ -> Hooks.set (Proxy :: _ "baz") (baz + 1) ]
+              [ HE.onClick \_ -> Sugar.set (Proxy :: _ "baz") (baz + 1) ]
               [ HH.text "Incr baz" ]
           ]
       )

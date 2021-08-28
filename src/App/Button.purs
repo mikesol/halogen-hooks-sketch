@@ -3,6 +3,7 @@ module App.Button where
 import Prelude
 
 import App.Hooks as Hooks
+import App.Sugar as Sugar
 import Control.Applicative.Indexed (ipure)
 import Control.Monad.Indexed.Qualified as Ix
 import Effect.Aff (Aff)
@@ -27,17 +28,17 @@ affAdd1 = pure <<< add 1
 component :: forall q i o. H.Component q i o Aff
 component =
   Hooks.component Hooks.defaultOptions \_ -> Ix.do
-    foo <- Hooks.hook (Proxy :: _ "foo") 0
-    bar <- Hooks.hookM (Proxy :: _ "bar") (lift aff0)
+    foo <- Sugar.useState (Proxy :: _ "foo") 0
+    bar <- Hooks.hook (Proxy :: _ "bar") (lift aff0)
     ipure
       ( HH.div_
           [ HH.p_
               [ HH.text $ "Foo: " <> show foo <> " Bar: " <> show bar ]
           , HH.button
-              [ HE.onClick \_ -> Hooks.setM (Proxy :: _ "foo") (lift $ affAdd1 foo) ]
+              [ HE.onClick \_ -> Sugar.setM (Proxy :: _ "foo") (lift $ affAdd1 foo) ]
               [ HH.text "Incr foo" ]
           , HH.button
-              [ HE.onClick \_ -> Hooks.set (Proxy :: _ "bar") (bar + 1) ]
+              [ HE.onClick \_ -> Sugar.set (Proxy :: _ "bar") (bar + 1) ]
               [ HH.text "Incr bar" ]
           ]
       )
