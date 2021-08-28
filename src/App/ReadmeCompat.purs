@@ -13,7 +13,7 @@ import Halogen.HTML.Events as HE
 data Query a = IsOn (Boolean -> a)
 
 component :: forall i o. H.Component Query i o Aff
-component = Hooks.component \{ queryToken } input -> Hooks.do
+component = Hooks.component \{ queryToken } _ -> Hooks.do
   count /\ countId <- Hooks.useState 0
   Hooks.useQuery queryToken case _ of
     IsOn reply -> do
