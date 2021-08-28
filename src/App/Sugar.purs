@@ -2,7 +2,7 @@ module App.Sugar where
 
 import Prelude
 
-import App.Hooks (class NotReadOnly, HookAction, HookM, IndexedHookM, doThis, hook, lift, setHookMCons)
+import App.Hooks (class NotReadOnly, HookAction, HookM, IndexedHookM, doThis, hookCons, lift, setHookMCons)
 import Control.Applicative.Indexed (iwhen)
 import Control.Monad.Indexed.Qualified as Ix
 import Data.Symbol (class IsSymbol)
@@ -25,13 +25,14 @@ capture ::
   IsSymbol sym =>
   Row.Lacks sym i =>
   Row.Cons sym v i o =>
+  Row.Lacks sym hooks' =>
   Row.Cons sym v hooks' hooks =>
   Eq v =>
   v ->
   HookM hooks input slots output m Unit ->
   IndexedHookM hooks input slots output m i o Unit
 capture v m = Ix.do
-  prev <- hook px (pure v)
+  prev <- hookCons px (pure v)
   iwhen (prev /= v) (lift (setHookMCons px v *> m))
   where
   px = Proxy :: _ sym
@@ -41,11 +42,12 @@ useState ::
   IsSymbol sym =>
   Row.Lacks sym i =>
   Row.Cons sym v i o =>
+  Row.Lacks sym hooks' =>
   Row.Cons sym v hooks' hooks =>
   proxy sym ->
   v ->
   IndexedHookM hooks input slots output m i o v
-useState px = hook px <<< pure
+useState px = hookCons px <<< pure
 
 setM ::
   forall proxy output input slots m sym a r1 hooks.

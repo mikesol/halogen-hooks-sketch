@@ -1,6 +1,6 @@
 module App.Hooks
   ( IndexedHookM
-  , hook
+  , hookCons
   , component
   , getHooksM
   , lift
@@ -223,7 +223,7 @@ component options f =
           }
     }
 
-newtype IndexedHookM hooks input slots output m (i :: Row Type) (o :: Row Type) a
+newtype IndexedHookM (hooks :: Row Type) (input :: Type) (slots :: Row Type) (output :: Type) (m :: Type -> Type) (i :: Row Type) (o :: Row Type) a
   = IndexedHookM (HookM hooks input slots output m a)
 
 derive instance indexedHookFFunctor :: Functor (IndexedHookM hooks input slots output m i i)
@@ -265,16 +265,17 @@ lift ::
   IndexedHookM hooks input slots output m i i v
 lift = IndexedHookM
 
-hook ::
+hookCons ::
   forall hooks' hooks input slots output proxy sym m v i o.
   IsSymbol sym =>
   Lacks sym i =>
   Cons sym v i o =>
+  Lacks sym hooks' =>
   Cons sym v hooks' hooks =>
   proxy sym ->
   HookM hooks input slots output m v ->
   IndexedHookM hooks input slots output m i o v
-hook px m = IndexedHookM go
+hookCons px m = IndexedHookM go
   where
   go =
     getHookCons px <$> getHooksM
