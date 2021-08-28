@@ -36,7 +36,6 @@ module App.Hooks
   ) where
 
 import Prelude
-
 import Control.Applicative.Indexed (class IxApplicative, iapply, ipure, iwhen)
 import Control.Apply.Indexed (class IxApply)
 import Control.Bind.Indexed (class IxBind, ibind)
@@ -50,7 +49,7 @@ import Control.Monad.Writer.Class (class MonadTell)
 import Control.Parallel.Class (class Parallel, parallel, sequential)
 import Data.Functor.Indexed (class IxFunctor)
 import Data.Map (Map)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (class IsSymbol, reflectSymbol)
 import Data.Variant (Variant, inj)
@@ -336,10 +335,13 @@ hookM ::
   proxy sym ->
   HookM hooks emittedValue input slots output m v ->
   IndexedHookM hooks emittedValue input slots output m i o v
-hookM px m = IndexedHookM (go unit)
+hookM px m = IndexedHookM go
   where
-  go _ = unhedgeAt px <$> getHooks
-      >>= (maybe ((m >>= setHook px) *> go unit) pure)
+  go =
+    unhedgeAt px <$> getHooks
+      >>= case _ of
+          Nothing -> (m >>= setHook px) *> go
+          Just v -> pure v
 
 data Action hooks emittedValue input slots output m
   = Initialize
