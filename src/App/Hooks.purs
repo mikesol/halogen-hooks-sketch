@@ -337,11 +337,11 @@ hookM ::
   IndexedHookM hooks emittedValue input slots output m i o v
 hookM px m = IndexedHookM go
   where
-  go = do
-    hooks <- getHooks
-    case unhedgeAt px hooks of
-      Nothing -> (m >>= setHook px) *> go
-      Just v -> pure v
+  go =
+    unhedgeAt px <$> getHooks
+      >>= case _ of
+          Nothing -> (m >>= setHook px) *> go
+          Just v -> pure v
 
 data Action hooks emittedValue input slots output m
   = Initialize
