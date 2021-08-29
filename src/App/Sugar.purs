@@ -7,35 +7,22 @@ import Control.Applicative.Indexed (iwhen)
 import Control.Monad.Indexed.Qualified as Ix
 import Data.Symbol (class IsSymbol)
 import Prim.Row as Row
-import Prim.RowList as RL
-import Prim.Symbol as Symbol
-import Type.Proxy (Proxy(..))
-
-class GetLexicalLast (default :: Symbol) (i :: RL.RowList Type) (s :: Symbol) | default i -> s
-
-instance getLexicalLastNil :: GetLexicalLast sym RL.Nil sym
-
-instance getLexicalLastCons :: GetLexicalLast sym rest o => GetLexicalLast prev (RL.Cons sym val rest) o
 
 capture ::
-  forall iRL sym' hooks' hooks input slots output m sym v i o.
-  RL.RowToList i iRL =>
-  GetLexicalLast "" iRL sym' =>
-  Symbol.Append sym' "_" sym =>
+  forall proxy hooks' hooks input slots output m sym v i o.
   IsSymbol sym =>
   Row.Lacks sym i =>
   Row.Cons sym v i o =>
   Row.Lacks sym hooks' =>
   Row.Cons sym v hooks' hooks =>
   Eq v =>
+  proxy sym ->
   v ->
   HookM hooks input slots output m Unit ->
   IndexedHookM hooks input slots output m i o Unit
-capture v m = Ix.do
+capture px v m = Ix.do
   prev <- hookCons px (pure v)
   iwhen (prev /= v) (lift (setHookMCons px v *> m))
-  where
-  px = Proxy :: _ sym
 
 useState ::
   forall hooks' hooks input slots output proxy sym m v i o.

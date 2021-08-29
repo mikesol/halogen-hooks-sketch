@@ -13,13 +13,13 @@ module App.Hooks.Compat
   , OutputToken
   , Q
   , F
+  , class GetLexicalLast
   , pure
   , bind
   , discard
   ) where
 
 import Prelude
-
 import App.Hooks as Hooks
 import App.Sugar as Sugar
 import Control.Applicative.Indexed (class IxApplicative, ipure, (:*>))
@@ -122,11 +122,17 @@ unF ::
     )
 unF (F q) = q
 
+class GetLexicalLast (default :: Symbol) (i :: RL.RowList Type) (s :: Symbol) | default i -> s
+
+instance getLexicalLastNil :: GetLexicalLast sym RL.Nil sym
+
+instance getLexicalLastCons :: GetLexicalLast sym rest o => GetLexicalLast prev (RL.Cons sym val rest) o
+
 useRef ::
   forall i iRL o t267 hooks input slots output sym' sym m v.
   IsSymbol sym =>
   RL.RowToList i iRL =>
-  Sugar.GetLexicalLast "" iRL sym' =>
+  GetLexicalLast "" iRL sym' =>
   Symbol.Append sym' "_" sym =>
   Row.Lacks sym i => Row.Cons sym (Ref.Ref v) i o => Row.Lacks sym t267 => Row.Cons sym (Ref.Ref v) t267 hooks => MonadEffect m => v -> Hooks.IndexedHookM hooks input slots output m i o (v /\ (Ref.Ref v))
 useRef v = Ix.do
@@ -207,7 +213,7 @@ useLifecycleEffect ::
   forall i o hooks'' input slots output m query hooks' iRL sym' sym.
   IsSymbol sym =>
   RL.RowToList i iRL =>
-  Sugar.GetLexicalLast "" iRL sym' =>
+  GetLexicalLast "" iRL sym' =>
   Symbol.Append sym' "_" sym =>
   Row.Lacks sym i =>
   Row.Cons sym Unit i o =>
@@ -364,7 +370,7 @@ useQuery _ fun = Hooks.lift (Hooks.setHookMCons (Proxy :: _ "") (Q fun))
 useState ::
   forall hooks' hooks input slots output sym sym' m v i iRL o.
   RL.RowToList i iRL =>
-  Sugar.GetLexicalLast "" iRL sym' =>
+  GetLexicalLast "" iRL sym' =>
   Symbol.Append sym' "_" sym =>
   IsSymbol sym =>
   Row.Lacks sym i =>
@@ -402,7 +408,7 @@ modify_ px f =
 capture ::
   forall iRL sym' hooks' hooks input slots output m sym v i o.
   RL.RowToList i iRL =>
-  Sugar.GetLexicalLast "" iRL sym' =>
+  GetLexicalLast "" iRL sym' =>
   Symbol.Append sym' "_" sym =>
   IsSymbol sym =>
   Row.Lacks sym i =>
@@ -413,4 +419,4 @@ capture ::
   v ->
   Hooks.HookM hooks input slots output m Unit ->
   Hooks.IndexedHookM hooks input slots output m i o Unit
-capture = Sugar.capture
+capture = Sugar.capture (Proxy :: _ sym)
