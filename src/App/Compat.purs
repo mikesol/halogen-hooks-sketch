@@ -398,12 +398,7 @@ modify_ ::
   proxy sym ->
   (a -> a) ->
   Hooks.HookAction hooks input slots output m
-modify_ px f =
-  Hooks.doThis do
-    Hooks.getHookCons px <$> Hooks.getHooksM
-      >>= case _ of
-          Nothing -> Applicative.pure unit
-          Just v -> Hooks.setHookMCons px (f v)
+modify_ = Sugar.modify_
 
 capture ::
   forall iRL sym' hooks' hooks input slots output m sym v i o.

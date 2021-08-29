@@ -28,15 +28,15 @@ affAdd1 = pure <<< add 1
 component :: forall q i o. H.Component q i o Aff
 component =
   Hooks.component Hooks.defaultOptions \_ -> Ix.do
-    foo <- Sugar.useState (Proxy :: _ "foo") 0
+    foo <- Sugar.hookConsPure (Proxy :: _ "foo") 0
     { bar, baz } <-
       if foo `mod` 2 == 0 then Ix.ado
-        bar <- Sugar.useState (Proxy :: _ "bar") 0
-        baz <- Sugar.useState (Proxy :: _ "baz") 0
+        bar <- Sugar.hookConsPure (Proxy :: _ "bar") 0
+        baz <- Sugar.hookConsPure (Proxy :: _ "baz") 0
         in { bar, baz }
       else Ix.ado
-        baz <- Sugar.useState (Proxy :: _ "baz") 0
-        bar <- Sugar.useState (Proxy :: _ "bar") 0
+        baz <- Sugar.hookConsPure (Proxy :: _ "baz") 0
+        bar <- Sugar.hookConsPure (Proxy :: _ "bar") 0
         in { bar, baz }
     ipure
       ( HH.div_

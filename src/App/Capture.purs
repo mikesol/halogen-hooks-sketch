@@ -23,9 +23,9 @@ data Action
 component :: forall q i o. H.Component q i o Aff
 component =
   Hooks.component Hooks.defaultOptions \_ -> Ix.do
-    foo <- Sugar.useState (Proxy :: _ "foo") 0
-    Sugar.capture foo (lift $ Log.info "I changed!")
-    bar <- Sugar.useState (Proxy :: _ "bar") 0
+    foo <- Sugar.hookConsPure (Proxy :: _ "foo") 0
+    Sugar.capture (Proxy :: _ "captured") foo (lift $ Log.info "I changed!")
+    bar <- Sugar.hookConsPure (Proxy :: _ "bar") 0
     ipure
       ( HH.div_
           [ HH.p_
