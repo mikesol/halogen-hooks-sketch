@@ -3,9 +3,11 @@ module App.Hooks.Compat
   , useQuery
   , useTickEffect
   , useLifecycleEffect
+  , useMemo
+  , useRef
   , component
-  , modify_
   , capture
+  , modify_
   , QueryToken
   , SlotsToken
   , OutputToken
@@ -26,6 +28,8 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (class IsSymbol)
 import Data.Traversable (sequence)
 import Data.Tuple.Nested (type (/\), (/\))
+import Effect.Class (class MonadEffect)
+import Effect.Ref as Ref
 import Halogen as H
 import Prelude as Applicative
 import Prelude as Bind
@@ -116,6 +120,18 @@ unF ::
         Unit
     )
 unF (F q) = q
+
+useRef ::
+  forall i iRL o t267 hooks input slots output sym' sym m v.
+  IsSymbol sym =>
+  RL.RowToList i iRL =>
+  Sugar.GetLexicalLast "" iRL sym' =>
+  Symbol.Append sym' "_" sym =>
+  Row.Lacks sym i => Row.Cons sym (Ref.Ref v) i o => Row.Lacks sym t267 => Row.Cons sym (Ref.Ref v) t267 hooks => MonadEffect m => v -> Hooks.IndexedHookM hooks input slots output m i o (v /\ (Ref.Ref v))
+useRef v = Ix.do
+  ref <- Hooks.hookCons (Proxy :: _ sym) (H.liftEffect (Ref.new v))
+  val <- Hooks.lift (H.liftEffect (Ref.read ref))
+  ipure (val /\ ref)
 
 component ::
   forall (query :: Type -> Type) (hooks' :: Row Type) (input :: Type) (slots :: Row Type) (output :: Type) (m :: Type -> Type).
@@ -291,6 +307,27 @@ useTickEffect i =
             $ case iRes of
                 Nothing -> arr
                 Just iRes' -> [ iRes' ] <> arr
+    )
+
+useMemo ::
+  forall query hooks' input slots output m i a.
+  (Unit -> a) ->
+  Hooks.IndexedHookM
+    ( "" :: Q query hooks' input slots output m
+    , "_" :: F query hooks' input slots output m
+    | hooks'
+    )
+    input
+    slots
+    output
+    m
+    i
+    i
+    a
+useMemo fun =
+  Hooks.lift
+    ( Bind.bind (Applicative.pure unit) \ut ->
+        Applicative.pure (fun ut)
     )
 
 useQuery ::
