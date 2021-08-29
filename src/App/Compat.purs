@@ -1,7 +1,6 @@
 module App.Hooks.Compat where
 
 import Prelude
-
 import App.Hooks (getHookCons)
 import App.Hooks as Hooks
 import App.Sugar as Sugar
@@ -17,7 +16,6 @@ import Prim.Row as Row
 import Prim.RowList as RL
 import Prim.Symbol as Symbol
 import Type.Proxy (Proxy(..))
-import Unsafe.Coerce (unsafeCoerce)
 
 data QueryToken (query :: Type -> Type)
   = QueryToken
@@ -35,26 +33,58 @@ type ComponentTokens q s o
     , outputToken :: OutputToken o
     }
 
-component ::
-  forall (query :: Type -> Type) (hooks' :: Row Type) (input :: Type) (slots :: Row Type) (output :: Type) (m :: Type -> Type).
-  Row.Lacks "" hooks' =>
-  ( ComponentTokens query slots output ->
-    input ->
-    Hooks.IndexedHookM
-      ( "" :: Void
+data Q query hooks' input slots output m
+  = Q
+    ( forall a.
+      query a ->
+      Hooks.HookM
+        ( "" :: Q query hooks' input slots output m
+        | hooks'
+        )
+        input
+        slots
+        output
+        m
+        (Maybe a)
+    )
+
+unQ ::
+  forall query hooks' input slots output m.
+  Q query hooks' input slots output m ->
+  ( forall a.
+    query a ->
+    Hooks.HookM
+      ( "" :: Q query hooks' input slots output m
       | hooks'
       )
       input
       slots
       output
       m
-      ( "" :: Void
+      (Maybe a)
+  )
+unQ (Q q) = q
+
+component ::
+  forall (query :: Type -> Type) (hooks' :: Row Type) (input :: Type) (slots :: Row Type) (output :: Type) (m :: Type -> Type).
+  Row.Lacks "" hooks' =>
+  ( ComponentTokens query slots output ->
+    input ->
+    Hooks.IndexedHookM
+      ( "" :: Q query hooks' input slots output m
+      | hooks'
       )
-      ( "" :: Void
+      input
+      slots
+      output
+      m
+      ( "" :: Q query hooks' input slots output m
+      )
+      ( "" :: Q query hooks' input slots output m
       | hooks'
       )
       ( Hooks.HookHTML
-          ( "" :: Void
+          ( "" :: Q query hooks' input slots output m
           | hooks'
           )
           input
@@ -72,46 +102,14 @@ component f =
             Hooks.getHooksM
               >>= \hooks -> case getHookCons (Proxy :: _ "") hooks of
                   Nothing -> Applicative.pure Nothing
-                  Just fun -> (unsafeUnQ fun) q
+                  Just fun -> (unQ fun) q
         }
     )
     go
   where
-  unsafeQ ::
-    ( forall a.
-      query a ->
-      Hooks.HookM
-        ( "" :: Void
-        | hooks'
-        )
-        input
-        slots
-        output
-        m
-        (Maybe a)
-    ) ->
-    Void
-  unsafeQ = unsafeCoerce
-
-  unsafeUnQ ::
-    Void ->
-    ( forall a.
-      query a ->
-      Hooks.HookM
-        ( "" :: Void
-        | hooks'
-        )
-        input
-        slots
-        output
-        m
-        (Maybe a)
-    )
-  unsafeUnQ = unsafeCoerce
-
   start =
     Hooks.hookCons (Proxy :: _ "")
-      (Applicative.pure ((unsafeQ (const $ Applicative.pure Nothing))))
+      (Applicative.pure ((Q (const $ Applicative.pure Nothing))))
 
   go =
     ( \i -> Ix.do
@@ -130,7 +128,7 @@ useQuery ::
   ( forall a.
     query a ->
     Hooks.HookM
-      ( "" :: Void
+      ( "" :: Q query hooks' input slots output m
       | hooks'
       )
       input
@@ -140,7 +138,7 @@ useQuery ::
       (Maybe a)
   ) ->
   Hooks.IndexedHookM
-    ( "" :: Void
+    ( "" :: Q query hooks' input slots output m
     | hooks'
     )
     input
@@ -150,23 +148,7 @@ useQuery ::
     i
     i
     Unit
-useQuery _ fun = Hooks.lift (Hooks.setHookMCons (Proxy :: _ "") (unsafeQ fun))
-  where
-  unsafeQ ::
-    ( forall a.
-      query a ->
-      Hooks.HookM
-        ( "" :: Void
-        | hooks'
-        )
-        input
-        slots
-        output
-        m
-        (Maybe a)
-    ) ->
-    Void
-  unsafeQ = unsafeCoerce
+useQuery _ fun = Hooks.lift (Hooks.setHookMCons (Proxy :: _ "") (Q fun))
 
 useState ::
   forall hooks' hooks input slots output sym sym' m v i iRL o.
