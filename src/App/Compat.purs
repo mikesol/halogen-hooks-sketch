@@ -19,6 +19,7 @@ module App.Hooks.Compat
   ) where
 
 import Prelude
+
 import App.Hooks as Hooks
 import App.Sugar as Sugar
 import Control.Applicative.Indexed (class IxApplicative, ipure, (:*>))
@@ -26,7 +27,7 @@ import Control.Bind.Indexed (class IxBind, class IxDiscard, ibind, idiscard, ima
 import Control.Monad.Indexed.Qualified as Ix
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (class IsSymbol)
-import Data.Traversable (sequence)
+import Data.Traversable (fold, sequence)
 import Data.Tuple.Nested (type (/\), (/\))
 import Effect.Class (class MonadEffect)
 import Effect.Ref as Ref
@@ -180,7 +181,7 @@ component f =
           Hooks.getHooksM
             >>= \hooks -> case Hooks.getHookCons (Proxy :: _ "_") hooks of
                 Nothing -> Applicative.pure unit
-                Just arr -> void $ sequence (unF arr)
+                Just arr -> fold <$> sequence (unF arr)
         }
     )
     go
